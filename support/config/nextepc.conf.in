@@ -1,14 +1,14 @@
-db_uri: mongodb://localhost/nextepc
+db_uri: consul://10.10.10.171/nextepc
 
 logger:
-    file: @LOCALSTATE_DIR@/log/nextepc/nextepc.log
+    file: /home/cjh/sandbox/nextepc/install/var/log/nextepc/nextepc.log
     trace: 
         app: 1
-        s1ap: 1
-        nas: 1
+        s1ap: 2
+        nas: 2
         diameter: 1
-        gtpv2: 1
-        gtp: 1
+        gtpv2: 2
+        gtp: 2
 
 # 
 # parameter:
@@ -34,6 +34,7 @@ logger:
 #
 parameter:
     no_ipv6: true
+    multicast: true
 
 mme:
     freeDiameter: mme.conf
@@ -99,10 +100,10 @@ mme:
 #
     gummei: 
       plmn_id:
-        mcc: 001
-        mnc: 01
-      mme_gid: 2
-      mme_code: 1
+        mcc: 998
+        mnc: 98
+      mme_gid: 4
+      mme_code: 4410
 
 #
 #  <TAI>
@@ -138,9 +139,9 @@ mme:
 #
     tai:
       plmn_id:
-        mcc: 001
-        mnc: 01
-      tac: 12345
+        mcc: 998
+        mnc: 98
+      tac: 7
 
     security:
         integrity_order : [ EIA1, EIA2, EIA0 ]
@@ -154,7 +155,7 @@ mme:
 #
 
     network_name:
-        full: NextEPC
+        full: 4410net
 
 hss:
     freeDiameter: hss.conf
@@ -165,67 +166,45 @@ sgw:
 #
 #  o Specify SGW addresses the GTP-C must connect to
 #
-#  o One SGW is defined. If prefer_ipv4 is not true, [fe80::2%@LO_DEV@] is selected.
+#  o One SGW is defined. If prefer_ipv4 is not true, [fe80::2%lo] is selected.
 #    gtpc:
 #      addr:
 #        - 127.0.0.2
-#        - fe80::2%@LO_DEV@
+#        - fe80::2%lo
 #
 #  o Two SGW are defined. MME selects SGW with round-robin manner per UE
 #    gtpc:
 #      - addr: 127.0.0.2
-#      - addr: fe80::2%@LO_DEV@
+#      - addr: fe80::2%lo
 #
 #  o Three SGW are defined. MME selects SGW with round-robin manner per UE
 #    gtpc:
 #      - addr
 #        - 127.0.0.2
-#        - fe80::2%@LO_DEV@
+#        - fe80::2%lo
 #      - addr
 #        - 127.0.0.12
-#        - fe80::12%@LO_DEV@
+#        - fe80::12%lo
 #      - name: sgw3.nextepc.org
 #
 #  ------------------------ SGW --------------------------
 #
-#  o GTP-C Server(127.0.0.2:2123, [fe80::2%@LO_DEV@]:2123)
+#  o GTP-C Server(127.0.0.2:2123, [fe80::2%lo]:2123)
 #    gtpc:
 #      addr:
 #        - 127.0.0.2
-#        - fe80::2%@LO_DEV@
+#        - fe80::2%lo
 #
-#  o On SGW, Same Configuration(127.0.0.2:2123, [fe80::2%@LO_DEV@]:2123) as below.
+#  o On SGW, Same Configuration(127.0.0.2:2123, [fe80::2%lo]:2123) as below.
 #    gtpc:
 #      - addr: 127.0.0.2
-#      - addr: fe80::2%@LO_DEV@
+#      - addr: fe80::2%lo
 #
     gtpc:
       addr: 127.0.0.2
 
 #
-# <SGW Selection Mode>
-# 
-# o Round-Robin
-#   (If `selection_mode` is omitted, the default mode is Round-Robin)
-#
-#   selection_mode: rr
-#   gtpc:
-#     addr: 127.0.0.2
-#     addr: 127.0.2.2
-#     addr: 127.0.4.2
-#
-# o SGW selection by eNodeB TAC
-#
-#   selection_mode: tac
-#   gtpc:
-#     - addr: 127.0.0.2
-#       tac: 26000
-#     - addr: 127.0.2.2
-#       tac: [25000, 27000, 28000]
-#
-
-#
-#  <GTP-U Server>
+#  <GTP-U Server>>
 #
 #  o GTP-U Server(all address avaiable)
 #    gtpu:
@@ -241,29 +220,29 @@ pgw:
 #  o Only first node is attempted. Others are ignored.
 #  o if HSS provide PGW addresss(per-UE), DB overwrites YAML-configuration.
 #
-#  o Two PGW are defined. 127.0.0.3:2123 is attempted. [fe80::3%@LO_DEV@]:2123 is ignored.
+#  o Two PGW are defined. 127.0.0.3:2123 is attempted. [fe80::3%lo]:2123 is ignored.
 #    gtpc:
 #      - addr: 127.0.0.3
-#      - addr: fe80::3%@LO_DEV@
+#      - addr: fe80::3%lo
 #
-#  o One PGW is defined. if prefer_ipv4 is not true, [fe80::3%@LO_DEV@] is selected.
+#  o One PGW is defined. if prefer_ipv4 is not true, [fe80::3%lo] is selected.
 #    gtpc:
 #      - addr: 
 #        - 127.0.0.3
-#        - fe80::3%@LO_DEV@
+#        - fe80::3%lo
 #
 #  ------------------------ PGW --------------------------
 #
-#  o GTP-C Server(127.0.0.3:2123, [fe80::3%@LO_DEV@]:2123)
+#  o GTP-C Server(127.0.0.3:2123, [fe80::3%lo]:2123)
 #    gtpc:
 #      addr:
 #        - 127.0.0.3
-#        - fe80::3%@LO_DEV@
+#        - fe80::3%lo
 #
-#  o On PGW, Same configuration(127.0.0.3:2123, [fe80::3%@LO_DEV@]:2123) as below.
+#  o On PGW, Same configuration(127.0.0.3:2123, [fe80::3%lo]:2123) as below.
 #    gtpc:
 #      - addr: 127.0.0.3
-#      - addr: fe80::3%@LO_DEV@
+#      - addr: fe80::3%lo
 #
     gtpc:
       addr:
@@ -337,7 +316,7 @@ pgw:
 #        dev: pgwtun3
 #
     ue_pool:
-      - addr: 45.45.0.1/16
+      - addr: 172.30.0.1/24
       - addr: cafe::1/64
 
 #

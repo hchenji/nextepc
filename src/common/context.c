@@ -18,8 +18,6 @@ static context_t self;
 
 static int context_initialized = 0;
 
-static bool use_consul = false;
-
 status_t context_init() {
 	d_assert(context_initialized == 0, return CORE_ERROR,
 			"Context already has been context_initialized");
@@ -319,12 +317,18 @@ status_t context_consul_init(const char *db_uri) {
 	self.db_name = malloc(sizeof(char) * strlen(ptr+2));
 	strcpy(self.db_name, ptr+2);
 
+	char uri[1024];
+	memcpy(uri, db_uri, (ptr-db_uri));
+	uri[(ptr-db_uri)] = '\0';
+
+	consul_client_init(self.db_client, uri, self.db_name);
+
 	return CORE_OK;
 }
 
 status_t context_db_init(const char *db_uri) {
 	if (!memcmp(db_uri, "consul://", 9)) {
-		use_consul = true;
+		self.use_consul = true;
 		return context_consul_init(db_uri);
 	}
 

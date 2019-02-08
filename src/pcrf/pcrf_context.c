@@ -344,6 +344,11 @@ status_t pcrf_db_init()
 {
     if (context_self()->db_client && context_self()->db_name)
     {
+    	//	consul doesn't need state
+    	if (context_self()->use_consul) {
+    		return CORE_OK;
+    	}
+
         self.subscriberCollection = mongoc_client_get_collection(
             context_self()->db_client, 
             context_self()->db_name, "subscribers");
@@ -365,9 +370,23 @@ status_t pcrf_db_final()
     return CORE_OK;
 }
 
+status_t pcrf_db_qos_data_consul(
+    c_int8_t *imsi_bcd, c_int8_t*apn, gx_message_t *gx_message) {
+
+	d_print("imsi is %s\n", imsi_bcd);
+
+	return CORE_ERROR;
+
+}
+
+
 status_t pcrf_db_qos_data(
     c_int8_t *imsi_bcd, c_int8_t *apn, gx_message_t *gx_message)
 {
+	if (context_self()->use_consul) {
+		return pcrf_db_qos_data_consul(imsi_bcd, apn, gx_message);
+	}
+
     status_t rv = CORE_OK;
     mongoc_cursor_t *cursor = NULL;
     bson_t *query = NULL;
