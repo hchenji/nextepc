@@ -7,6 +7,7 @@
 #include <mongoc.h>
 #include <yaml.h>
 #include "common/yaml_helper.h"
+#include "common/consul_http.h"
 
 #include "fd/fd_lib.h"
 
@@ -332,6 +333,11 @@ status_t hss_db_init()
 {
     if (context_self()->db_client && context_self()->db_name)
     {
+    	//	consul doesn't need state
+    	if (context_self()->use_consul) {
+    		return CORE_OK;
+    	}
+
         self.subscriberCollection = mongoc_client_get_collection(
             context_self()->db_client, 
             context_self()->db_name, "subscribers");
@@ -353,9 +359,25 @@ status_t hss_db_final()
     return CORE_OK;
 }
 
+status_t hss_db_auth_info_consul(
+    char *imsi_bcd, hss_db_auth_info_t *auth_info) {
+
+	//	see if imsi exists
+	char key[1024];
+	sprintf(key, "subscribers/%s", imsi_bcd);
+	char *val = consul_get(context_self()->db_client, key);
+	d_print("%s", val);
+
+	return CORE_OK;
+}
+
 status_t hss_db_auth_info(
     char *imsi_bcd, hss_db_auth_info_t *auth_info)
 {
+	if (context_self()->use_consul) {
+		return hss_db_auth_info_consul(imsi_bcd, auth_info);
+	}
+
     status_t rv = CORE_OK;
     mongoc_cursor_t *cursor = NULL;
     bson_t *query = NULL;

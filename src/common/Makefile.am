@@ -3,8 +3,8 @@
 noinst_LTLIBRARIES = libcommon.la
 
 libcommon_la_SOURCES = \
-	context.h application.h yaml_helper.h \
-	context.c application.c yaml_helper.c \
+	context.h application.h yaml_helper.h consul_http.h base64.h jsmn.h \
+	context.c application.c yaml_helper.c consul_http.c base64.c jsmn.c \
 	$(NULL)
 
 libcommon_la_DEPENDENCIES = \
@@ -15,11 +15,13 @@ libcommon_la_LIBADD = \
     $(top_srcdir)/lib/core/src/libcore.la \
 	@YAML_LIBS@ \
 	@MONGOC_LIBS@ \
+	@CURL_LIBS@ \
 	$(NULL)
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir)/lib/core/include \
 	@MONGOC_CFLAGS@ \
+	@CURL_CFLAGS@ \
 	$(NULL)
 
 AM_CFLAGS = \

@@ -3,6 +3,7 @@
 
 #include "core_debug.h"
 #include "core_param.h"
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +26,7 @@ typedef struct _context_t {
     void *db_client;
     char *db_name;
     void *database;
+    bool use_consul;
 
     struct {
         const char *path;

@@ -409,6 +409,7 @@ AM_CONDITIONAL([USRSCTP], [test x$have_usrsctp_lib = xyes])
 
 PKG_CHECK_MODULES([YAML], yaml-0.1 >= 0.1.4)
 PKG_CHECK_MODULES([MONGOC], libmongoc-1.0 >= 1.3.1)
+PKG_CHECK_MODULES([CURL], libcurl >= 7.0)
 FREEDIAMETER_DIR=freeDiameter-1.2.1
 AC_SUBST(FREEDIAMETER_DIR)
 
@@ -472,8 +473,8 @@ version                 : ${PACKAGE_VERSION}
 host                    : ${host}
 source code location    : ${srcdir}
 compiler                : ${CC}
-compiler flags          : ${CFLAGS} ${YAML_CFLAGS} ${MONGOC_CFLAGS} 
-linker flags            : ${LDFLAGS} ${LIBS} ${YAML_LIBS} ${MONGOC_LIBS}
+compiler flags          : ${CFLAGS} ${YAML_CFLAGS} ${MONGOC_CFLAGS} ${CURL_CFLAGS} 
+linker flags            : ${LDFLAGS} ${LIBS} ${YAML_LIBS} ${MONGOC_LIBS} ${CURL_LIBS}
 bin directory           : ${BIN_DIR}
 lib directory           : ${LIB_DIR}/nextepc
 config directory        : ${SYSCONF_DIR}/nextepc
