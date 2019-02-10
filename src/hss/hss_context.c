@@ -297,7 +297,7 @@ status_t hss_db_final() {
 status_t hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info) {
 	context_t *self = context_self();
 
-//	d_print("imsi is %s\n", imsi_bcd);
+//	d_error("imsi is %s\n", imsi_bcd);
 
 //	see if imsi exists
 	char qkey[1024];
@@ -305,7 +305,7 @@ status_t hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info) 
 	consul_kv_t *ll = consul_get_recurse(self->db_client, qkey);
 
 	if (ll == NULL) {
-		d_warn("Cannot find IMSI in DB : %s", imsi_bcd);
+		d_warn("Auth Info: Cannot find IMSI in DB : %s", imsi_bcd);
 		return CORE_ERROR;
 	}
 	memset(auth_info, 0, sizeof(hss_db_auth_info_t));
@@ -444,6 +444,8 @@ status_t hss_db_auth_info(char *imsi_bcd, hss_db_auth_info_t *auth_info) {
 status_t hss_db_update_rand_and_sqn_consul(char *imsi_bcd, c_uint8_t *rand,
 		c_uint64_t sqn) {
 
+//	d_error("imsi is %s\n", imsi_bcd);
+
 	context_t *ctxt = context_self();
 	char printable_rand[128];
 	d_assert(rand, return CORE_ERROR, "Null param");
@@ -503,6 +505,8 @@ status_t hss_db_update_rand_and_sqn(char *imsi_bcd, c_uint8_t *rand,
 }
 
 status_t hss_db_increment_sqn_consul(char *imsi_bcd) {
+
+//	d_error("imsi is %s\n", imsi_bcd);
 
 	context_t *ctxt = context_self();
 	char qkey[1024];
@@ -566,8 +570,11 @@ status_t hss_db_increment_sqn(char *imsi_bcd) {
 	return rv;
 }
 
+//	TODO: very incomplete, take in pgw ip address and other stuff from db
 status_t hss_db_subscription_data_consul(char *imsi_bcd,
 		s6a_subscription_data_t *subscription_data) {
+
+//	d_error("imsi is %s", imsi_bcd);
 
 	context_t *ctxt = context_self();
 	char qkey[1024];
@@ -600,7 +607,6 @@ status_t hss_db_subscription_data_consul(char *imsi_bcd,
 		} else if (!strcmp(key + len - 24, "subscribed_rau_tau_timer")) {
 			subscription_data->subscribed_rau_tau_timer = strtol(tmp->val, NULL,
 					10);
-
 		} else if (!strcmp(key + len - 6, "uplink")) {
 			subscription_data->ambr.uplink = strtol(tmp->val, NULL, 10) * 1024;
 		} else if (!strcmp(key + len - 8, "downlink")) {
@@ -621,6 +627,7 @@ status_t hss_db_subscription_data_consul(char *imsi_bcd,
 		int pdnnum = pdnarr[var];
 		pdn_t *pdn = NULL;
 		pdn = &subscription_data->pdn[pdnnum];
+		subscription_data->num_of_pdn++;
 
 		sprintf(qkey, "pdn/%d", pdnnum);
 		ll = consul_get_recurse(ctxt->db_client, qkey);
@@ -633,6 +640,7 @@ status_t hss_db_subscription_data_consul(char *imsi_bcd,
 
 			if (!strcmp(key + len - 3, "apn")) {
 				strncpy(pdn->apn, tmp->val, c_min(strlen(tmp->val), MAX_APN_LEN) + 1);
+//				d_error("apn is %s", pdn->apn);
 			} else if (!strcmp(key + len - 4, "type")) {
 				pdn->pdn_type = strtol(tmp->val, NULL, 10);
 			} else if (!strcmp(key + len - 3, "qci")) {
@@ -643,10 +651,14 @@ status_t hss_db_subscription_data_consul(char *imsi_bcd,
 				pdn->qos.arp.pre_emption_capability = strtol(tmp->val, NULL, 10);
 			} else if (!strcmp(key + len - 14, "_vulnerability")) {
 				pdn->qos.arp.pre_emption_vulnerability = strtol(tmp->val, NULL, 10);
+//				d_error("vulnerability is %d", pdn->qos.arp.pre_emption_vulnerability);
 			}
 
 			tmp = tmp->next;
 		}
+
+		pdn->ambr.uplink = 1024000 * 1024;
+		pdn->ambr.downlink = 1024000 * 1024;
 
 		consul_free_list(ll);
 

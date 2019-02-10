@@ -751,6 +751,8 @@ static void mme_s6a_ula_cb(void *data, struct msg **msg)
         }
 
         ret = fd_avp_search_avp(avp, s6a_apn_configuration_profile, &avpch1);
+//        d_error("s6a apn is %s\n", subscription_data->pdn[0].apn);
+//        d_error("s6a apnnum is %d\n", subscription_data->num_of_pdn);
         d_assert(ret == 0, return,);
         if (avpch1)
         {

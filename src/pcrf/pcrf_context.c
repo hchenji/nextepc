@@ -7,10 +7,11 @@
 #include <mongoc.h>
 #include <yaml.h>
 #include "common/yaml_helper.h"
-
+#include <stdbool.h>
 #include "fd/fd_lib.h"
 
 #include "common/context.h"
+#include "common/consul_http.h"
 #include "pcrf_context.h"
 
 static pcrf_context_t self;
@@ -373,9 +374,82 @@ status_t pcrf_db_final()
 status_t pcrf_db_qos_data_consul(
     c_int8_t *imsi_bcd, c_int8_t*apn, gx_message_t *gx_message) {
 
-	d_print("imsi is %s\n", imsi_bcd);
+//	d_error("apn is %s\n", apn);
 
-	return CORE_ERROR;
+	context_t *ctxt = context_self();
+	char qkey[1024];
+
+	sprintf(qkey, "subscribers/%s/pdn", imsi_bcd);
+	char *val = consul_get(ctxt->db_client, qkey);
+
+	bool found = false;
+	//	parse pdn_list
+	unsigned char *pdnarr = json_int_arr_to_native(val);
+	free(val);
+
+	for (int var = 1; var < pdnarr[0] + 1; ++var) {
+		int pdnnum = pdnarr[var];
+
+		sprintf(qkey, "pdn/%d", pdnnum);
+		consul_kv_t *ll = consul_get_recurse(ctxt->db_client, qkey);
+
+		//	iterate thru the linked list consisting of pdn info
+		consul_kv_t *tmp = ll;
+		while (tmp != NULL) {
+			size_t len = strlen(tmp->key);
+			char *key = tmp->key;
+
+			if (!strcmp(key + len - 3, "apn")) {
+				if (!strcmp(tmp->val, apn)) {
+					found = true;
+					break;
+				}
+			}
+
+			tmp = tmp->next;
+		}
+
+		if (found) {
+			//	this is the right pdn
+            pdn_t *pdn = NULL;
+            pdn = &gx_message->pdn;
+
+            //	reiterate thru list
+            tmp = ll;
+			while (tmp != NULL) {
+				size_t len = strlen(tmp->key);
+				char *key = tmp->key;
+
+				if (!strcmp(key + len - 3, "apn")) {
+					strncpy(pdn->apn, tmp->val, c_min(strlen(tmp->val), MAX_APN_LEN) + 1);
+//					d_print("apn is %s\n", pdn->apn);
+				} else if (!strcmp(key + len - 4, "type")) {
+					pdn->pdn_type = strtol(tmp->val, NULL, 10);
+				} else if (!strcmp(key + len - 3, "qci")) {
+					pdn->qos.qci  = strtol(tmp->val, NULL, 10);
+				} else if (!strcmp(key + len - 6, "_level")) {
+					pdn->qos.arp.priority_level = strtol(tmp->val, NULL, 10);
+				} else if (!strcmp(key + len - 11, "_capability")) {
+					pdn->qos.arp.pre_emption_capability = strtol(tmp->val, NULL, 10);
+				} else if (!strcmp(key + len - 14, "_vulnerability")) {
+					pdn->qos.arp.pre_emption_vulnerability = strtol(tmp->val, NULL, 10);
+				}
+
+				tmp = tmp->next;
+			}
+
+			//	stop searching
+			consul_free_list(ll);
+			break;
+
+		}
+		consul_free_list(ll);
+
+	}
+
+
+
+	return CORE_OK;
 
 }
 

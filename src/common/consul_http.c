@@ -46,6 +46,8 @@ CURLcode curl_get(char *url, char *buf) {
 
 	if (res != CURLE_OK) {
 		puts("http error occurred");
+		puts(url);
+		puts(buf);
 	}
 
 	/* always cleanup */

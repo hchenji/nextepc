@@ -313,14 +313,18 @@ status_t context_consul_init(const char *db_uri) {
 	const char *ptr = db_uri + strlen(db_uri);
 	while (*(ptr--) != '/') {
 	}
+
+	//	ptr now points to one character behind the / before the db name
 //	d_print("%s\n", ptr+2);
 	self.db_name = malloc(sizeof(char) * strlen(ptr+2));
 	strcpy(self.db_name, ptr+2);
 
 	char uri[1024];
-	memcpy(uri, db_uri, (ptr-db_uri));
-	uri[(ptr-db_uri)] = '\0';
-
+	strcpy(uri, "http://");
+	memcpy(uri+7, db_uri+9, (ptr-db_uri + 1 - 9));
+	uri[(ptr-db_uri + 1 - 9 + 7)] = '\0';
+//	d_print("context setting uri to %s\n", uri);
+//	d_print("context setting dbname to %s\n", self.db_name);
 	consul_client_init(self.db_client, uri, self.db_name);
 
 	return CORE_OK;
