@@ -44,6 +44,7 @@ testvolte_LDADD = $(top_srcdir)/src/libepc.la
 AM_CPPFLAGS = \
 	@OGSCORE_CFLAGS@ \
 	@MONGOC_CFLAGS@ \
+	@CURL_CFLAGS@ \
     -I$(top_srcdir)/lib \
     -I$(top_srcdir)/src \
     -I$(top_srcdir)/lib/asn1c/common \

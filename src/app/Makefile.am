@@ -11,6 +11,7 @@ libapp_la_LIBADD = \
 	@OGSCORE_LIBS@ \
 	@YAML_LIBS@ \
 	@MONGOC_LIBS@ \
+    @CURL_LIBS@ \
 	$(NULL)
  
 libapp_la_DEPENDENCIES = \
@@ -21,6 +22,7 @@ AM_CPPFLAGS = \
 	@OGSCORE_CFLAGS@ \
 	@YAML_CFLAGS@ \
 	@MONGOC_CFLAGS@ \
+	@CURL_CFLAGS@ \
 	-I$(top_srcdir)/lib \
 	$(NULL)
 

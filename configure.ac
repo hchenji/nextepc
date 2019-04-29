@@ -219,6 +219,7 @@ AC_CONFIG_FILES([test/Makefile])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 
+
 AC_MSG_NOTICE([NextEPC configuration:
 
   version:              ${PACKAGE_VERSION}

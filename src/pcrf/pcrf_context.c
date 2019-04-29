@@ -2,8 +2,7 @@
 #include <yaml.h>
 #include "fd/fd_lib.h"
 #include "app/context.h"
-
-#include "common/consul_http.h"
+#include "app/consul_http.h"
 #include "pcrf_context.h"
 
 static pcrf_context_t self;
@@ -307,7 +306,7 @@ int pcrf_db_init()
     {
     	//	consul doesn't need state
     	if (context_self()->use_consul) {
-    		return CORE_OK;
+    		return OGS_OK;
     	}
 
         self.subscriberCollection = mongoc_client_get_collection(
@@ -329,7 +328,7 @@ int pcrf_db_final()
     return OGS_OK;
 }
 
-int pcrf_db_qos_data_consul(c_int8_t *imsi_bcd, c_int8_t*apn, gx_message_t *gx_message) {
+int pcrf_db_qos_data_consul(char *imsi_bcd, char *apn, gx_message_t *gx_message) {
 
 //	d_error("apn is %s\n", apn);
 
@@ -337,7 +336,7 @@ int pcrf_db_qos_data_consul(c_int8_t *imsi_bcd, c_int8_t*apn, gx_message_t *gx_m
 	char qkey[1024];
 
 	sprintf(qkey, "subscribers/%s/pdn", imsi_bcd);
-	char *val = consul_get(ctxt->db_client, qkey);
+	char *val = consul_get(ctxt->db.client, qkey);
 
 	bool found = false;
 	//	parse pdn_list
@@ -348,7 +347,7 @@ int pcrf_db_qos_data_consul(c_int8_t *imsi_bcd, c_int8_t*apn, gx_message_t *gx_m
 		int pdnnum = pdnarr[var];
 
 		sprintf(qkey, "pdn/%d", pdnnum);
-		consul_kv_t *ll = consul_get_recurse(ctxt->db_client, qkey);
+		consul_kv_t *ll = consul_get_recurse(ctxt->db.client, qkey);
 
 		//	iterate thru the linked list consisting of pdn info
 		consul_kv_t *tmp = ll;
@@ -378,7 +377,7 @@ int pcrf_db_qos_data_consul(c_int8_t *imsi_bcd, c_int8_t*apn, gx_message_t *gx_m
 				char *key = tmp->key;
 
 				if (!strcmp(key + len - 3, "apn")) {
-					strncpy(pdn->apn, tmp->val, c_min(strlen(tmp->val), MAX_APN_LEN) + 1);
+					strncpy(pdn->apn, tmp->val, ogs_min(strlen(tmp->val), MAX_APN_LEN) + 1);
 //					d_print("apn is %s\n", pdn->apn);
 				} else if (!strcmp(key + len - 4, "type")) {
 					pdn->pdn_type = strtol(tmp->val, NULL, 10);

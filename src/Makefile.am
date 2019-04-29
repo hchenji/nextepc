@@ -68,6 +68,7 @@ libepc_la_LIBADD = \
 
 AM_CPPFLAGS = \
 	@OGSCORE_CFLAGS@ \
+	@CURL_CFLAGS@ \
 	-I$(top_srcdir)/src \
 	$(NULL)
 

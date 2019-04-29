@@ -1,6 +1,6 @@
 #include <mongoc.h>
 #include <yaml.h>
-#include "common/consul_http.h"
+#include "app/consul_http.h"
 #include "fd/fd_lib.h"
 #include "app/context.h"
 #include "hss_context.h"
@@ -329,11 +329,11 @@ int hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info) {
 //	see if imsi exists
 	char qkey[1024];
 	sprintf(qkey, "subscribers/%s", imsi_bcd);
-	consul_kv_t *ll = consul_get_recurse(self->db_client, qkey);
+	consul_kv_t *ll = consul_get_recurse(self->db.client, qkey);
 
 	if (ll == NULL) {
-		d_warn("Auth Info: Cannot find IMSI in DB : %s", imsi_bcd);
-		return CORE_ERROR;
+		ogs_warn("Auth Info: Cannot find IMSI in DB : %s", imsi_bcd);
+		return OGS_ERROR;
 	}
 	memset(auth_info, 0, sizeof(hss_db_auth_info_t));
 
@@ -344,28 +344,28 @@ int hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info) {
 		char *key = tmp->key;
 
 		if (!strcmp(key + len - 1, "k")) {
-			core_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->k,
+			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->k,
 					HSS_KEY_LEN);
 		}
 
 		else if (!strcmp(key + len - 3, "opc")) {
 			auth_info->use_opc = 1;
-			core_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->opc,
+			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->opc,
 					HSS_KEY_LEN);
 		}
 
 		else if (!strcmp(key + len - 2, "op")) {
-			core_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->op,
+			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->op,
 					HSS_KEY_LEN);
 		}
 
 		else if (!strcmp(key + len - 3, "amf")) {
-			core_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->amf,
+			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->amf,
 					HSS_AMF_LEN);
 		}
 
 		else if (!strcmp(key + len - 4, "rand")) {
-			core_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->rand,
+			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->rand,
 					RAND_LEN);
 		}
 
@@ -484,7 +484,7 @@ out:
     return rv;
 }
 
-int hss_db_update_rand_and_sqn_consul(char *imsi_bcd, c_uint8_t *rand, c_uint64_t sqn) {
+int hss_db_update_rand_and_sqn_consul(char *imsi_bcd, uint8_t *rand, uint64_t sqn) {
 
 //	d_error("imsi is %s\n", imsi_bcd);
 
@@ -497,12 +497,12 @@ int hss_db_update_rand_and_sqn_consul(char *imsi_bcd, c_uint8_t *rand, c_uint64_
 	char qkey[1024];
 
 	sprintf(qkey, "subscribers/%s/rand", imsi_bcd);
-	consul_put(ctxt->db_client, qkey, printable_rand);
+	consul_put(ctxt->db.client, qkey, printable_rand);
 
 	sprintf(qkey, "subscribers/%s/sqn", imsi_bcd);
 	char val[1024];
 	sprintf(val, "%ld", sqn);
-	consul_put(ctxt->db_client, qkey, val);
+	consul_put(ctxt->db.client, qkey, val);
 
 	return OGS_OK;
 }
@@ -512,7 +512,7 @@ int hss_db_update_rand_and_sqn(
 {
 
 	if (context_self()->use_consul) {
-		return hss_db_auth_info_consul(imsi_bcd, auth_info);
+		return hss_db_update_rand_and_sqn_consul(imsi_bcd, rand, sqn);
 	}
 
     int rv = OGS_OK;
@@ -557,14 +557,14 @@ int hss_db_increment_sqn_consul(char *imsi_bcd) {
 
 	sprintf(qkey, "subscribers/%s/sqn", imsi_bcd);
 
-	char *val = consul_get(ctxt->db_client, qkey);
-	c_uint64_t sqn = strtol(val, NULL, 10);
+	char *val = consul_get(ctxt->db.client, qkey);
+	uint64_t sqn = strtol(val, NULL, 10);
 	sqn++;
 
 	char put[1024];
 	sprintf(put, "%ld", sqn);
 
-	consul_put(ctxt->db_client, qkey, put);
+	consul_put(ctxt->db.client, qkey, put);
 
 	free(val);
 
@@ -574,7 +574,7 @@ int hss_db_increment_sqn_consul(char *imsi_bcd) {
 int hss_db_increment_sqn(char *imsi_bcd)
 {
 	if (context_self()->use_consul) {
-		return hss_db_auth_info_consul(imsi_bcd, auth_info);
+		return hss_db_increment_sqn_consul(imsi_bcd);
 	}
 
     int rv = OGS_OK;
@@ -631,11 +631,11 @@ int hss_db_subscription_data_consul(char *imsi_bcd, s6a_subscription_data_t *sub
 	char qkey[1024];
 
 	sprintf(qkey, "subscribers/%s", imsi_bcd);
-	consul_kv_t *ll = consul_get_recurse(ctxt->db_client, qkey);
+	consul_kv_t *ll = consul_get_recurse(ctxt->db.client, qkey);
 
 	if (ll == NULL) {
-		d_warn("Cannot find IMSI in DB : %s", imsi_bcd);
-		return CORE_ERROR;
+		ogs_warn("Cannot find IMSI in DB : %s", imsi_bcd);
+		return OGS_ERROR;
 	}
 
 	memset(subscription_data, 0, sizeof(s6a_subscription_data_t));
@@ -681,7 +681,7 @@ int hss_db_subscription_data_consul(char *imsi_bcd, s6a_subscription_data_t *sub
 		subscription_data->num_of_pdn++;
 
 		sprintf(qkey, "pdn/%d", pdnnum);
-		ll = consul_get_recurse(ctxt->db_client, qkey);
+		ll = consul_get_recurse(ctxt->db.client, qkey);
 
 		//	iterate thru the linked list consisting of pdn info
 		consul_kv_t *tmp = ll;
@@ -690,7 +690,7 @@ int hss_db_subscription_data_consul(char *imsi_bcd, s6a_subscription_data_t *sub
 			char *key = tmp->key;
 
 			if (!strcmp(key + len - 3, "apn")) {
-				strncpy(pdn->apn, tmp->val, c_min(strlen(tmp->val), MAX_APN_LEN) + 1);
+				strncpy(pdn->apn, tmp->val, ogs_min(strlen(tmp->val), MAX_APN_LEN) + 1);
 //				d_error("apn is %s", pdn->apn);
 			} else if (!strcmp(key + len - 4, "type")) {
 				pdn->pdn_type = strtol(tmp->val, NULL, 10);
@@ -721,7 +721,7 @@ int hss_db_subscription_data(
     char *imsi_bcd, s6a_subscription_data_t *subscription_data)
 {
 	if (context_self()->use_consul) {
-		return hss_db_auth_info_consul(imsi_bcd, auth_info);
+		return hss_db_subscription_data_consul(imsi_bcd, subscription_data);
 	}
 
 	int rv = OGS_OK;

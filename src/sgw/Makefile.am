@@ -26,6 +26,7 @@ AM_CPPFLAGS = \
     -I$(top_srcdir)/lib \
 	-I$(top_srcdir)/src \
 	@MONGOC_CFLAGS@ \
+	@CURL_CFLAGS@ \
 	$(NULL)
 
 AM_CFLAGS = \
