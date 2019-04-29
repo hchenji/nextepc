@@ -1,14 +1,26 @@
 db_uri: consul://10.10.10.171/nextepc
 
 logger:
-    file: /home/cjh/sandbox/nextepc/install/var/log/nextepc/nextepc.log
-    trace: 
-        app: 1
-        s1ap: 2
-        nas: 2
-        diameter: 1
-        gtpv2: 2
-        gtp: 2
+    file: @LOCALSTATE_DIR@/log/nextepc/nextepc.log
+# 
+#  o Set OGS_LOG_INFO to all domain level
+#   - If `level` is omitted, the default level is OGS_LOG_INFO)
+#   - If `domain` is omitted, the all domain level is set from 'level'
+#    (Nothing is needed)
+#
+#  o Set OGS_LOG_ERROR to all domain level
+#   - `level` can be set with none, fatal, error, warn, info, debug, trace
+#    level: error
+#
+#  o Set OGS_LOG_DEBUG to mme/emm domain level
+#    level: debug
+#    domain: mme,emm
+#
+#  o Set OGS_LOG_TRACE to all domain level
+#    level: trace
+#    domain: core,s1ap,nas,fd,gtp,mme,emm,esm,sgw,pgw,hss,pcrf,event,tlv,mem,sock
+#
+
 
 # 
 # parameter:
