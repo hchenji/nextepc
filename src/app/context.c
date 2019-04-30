@@ -366,6 +366,11 @@ int context_db_init(const char *db_uri)
 
 int context_db_final()
 {
+	if (self.use_consul) {
+		self.db.name = NULL;
+		self.db.client = NULL;
+		return OGS_OK;
+	}
     if (self.db.database)
     {
         mongoc_database_destroy(self.db.database);
