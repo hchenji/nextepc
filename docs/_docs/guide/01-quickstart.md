@@ -1,5 +1,5 @@
 ---
-title: Qucikstart
+title: Quickstart
 ---
 
 **Note:** NextEPC supports installation of packages in *Debian/Ubuntu and openSUSE* environments. *CentOS, Fedora, FreeBSD, and Mac OSX* require you to [build with source code]({{ site.url }}{{ site.baseurl }}/docs/guide/02-building-nextepc-from-sources)
@@ -31,7 +31,7 @@ $ sudo apt-key add Release.key
 In Debian 9.0(stretch), you can install it as follows:
 
 ```bash
-$ sudo sh -c "echo 'deb https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_9.0/ ./' > /etc/apt/sources.list.d/open5gs.list"
+$ sudo sh -c "echo 'deb http://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_9.0/ ./' > /etc/apt/sources.list.d/open5gs.list"
 $ sudo apt update
 $ sudo apt install nextepc
 ```
@@ -39,12 +39,12 @@ $ sudo apt install nextepc
 Other Linux distributions can be installed by changing the path.
 
 ```
-https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_9.0/
-https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Raspbian_9.0/
-https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_16.04/
-https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_17.10/
-https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_18.04/
-https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_18.10/
+http://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_9.0/
+http://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Raspbian_9.0/
+http://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_16.04/
+http://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_17.10/
+http://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_18.04/
+http://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_18.10/
 ```
 
 [Martin Hauke](https://build.opensuse.org/user/show/mnhauke) packaged NextEPC for *openSUSE* on [OBS](https://build.opensuse.org/package/show/home:mnhauke:nextepc/nextepc).
@@ -119,8 +119,9 @@ $ sudo systemctl restart nextepc-sgwd
 1. *Debian and Ubuntu* based Linux distributions can install [Node.js](https://nodejs.org/) as follows:
 
     ```bash
+    $ sudo apt update
     $ sudo apt install curl
-    $ curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
+    $ curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
     $ sudo apt install nodejs
     ```
 
@@ -133,7 +134,7 @@ $ sudo systemctl restart nextepc-sgwd
 You can now install WebUI of NextEPC.
 
 ```bash
-$ curl -sL {{ site.url }}/static/webui/install | sudo -E bash -
+$ curl -sL {{ site.url }}{{ site.baseurl }}/assets/webui/install | sudo -E bash -
 ```
 
 ### Register Subscriber Information
@@ -164,17 +165,44 @@ To add subscriber information, you can do WebUI operations in the following orde
 If your phone can connect to internet, you must run the following command in NextEPC-PGW installed host. 
 
 ```bash
+### Check IP Tables
+$ sudo iptables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+
+### Check NAT Tables
+$ sudo iptables -L -t nat
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+
+### Enable IPv4 Forwarding
 $ sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
-$ sudo iptables -t nat -A POSTROUTING -o 'interface-name' -j MASQUERADE
-$ sudo iptables -I INPUT -i pgwtun -j ACCEPT
+
+### Add NAT Rule
+$ sudo iptables -t nat -A POSTROUTING -s 45.45.0.0/16 ! -o pgwtun -j MASQUERADE
 ```
 
-**Note:** In the above command, you should replace `'interface-name'` with your interface name that can connect to the internet. (For example, `enp0s25`, `wls3`, and so on).
+**Note:** For the first time, it is a good condition if you do not have any rules in the IP/NAT tables. If a program such as docker has already set up a rule, you will need to add a rule differently.
 {: .notice--danger}
 
 ### Turn on your eNodeB and Phone
 ---
-
+- Connect your eNodeB to the IP of your server via the standard S1AP port of SCTP 36412 (for MME)
 - You can see actual traffic through wireshark -- [[srsenb.pcapng]]({{ site.url }}{{ site.baseurl }}/assets/pcapng/srsenb.pcapng).
 - You can view the log at `/var/log/nextepc/*.log`.
 
@@ -216,7 +244,8 @@ How to remove NextEPC package:
 1. On *Ubuntu*:
 
     ```bash
-    $ sudo apt purge nextepc*
+    $ sudo apt purge nextepc
+    $ sudo apt autoremove
     ```
 
 2. On *openSUSE*:
