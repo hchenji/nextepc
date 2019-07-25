@@ -396,11 +396,6 @@ int context_consul_init(const char *db_uri) {
 int context_db_init(const char *db_uri)
 {
 
-	if (!memcmp(db_uri, "consul://", 9)) {
-		self.use_consul = true;
-		return context_consul_init(db_uri);
-	}
-
     bson_t reply;
     bson_error_t error;
     bson_iter_t iter;
@@ -408,6 +403,11 @@ int context_db_init(const char *db_uri)
     const mongoc_uri_t *uri;
 
     memset(&self.db, 0, sizeof self.db);
+
+	if (!memcmp(db_uri, "consul://", 9)) {
+		self.use_consul = true;
+		return context_consul_init(db_uri);
+	}
 
     mongoc_init();
     self.db.initialized = true;
@@ -445,12 +445,13 @@ int context_db_init(const char *db_uri)
 
 int context_db_final()
 {
+	if (self.use_consul) {
+		self.db.name = NULL;
+		self.db.client = NULL;
+//		return OGS_OK;
+	}
+
     if (self.db.database) {
-    	if (self.use_consul) {
-    		self.db.name = NULL;
-    		self.db.client = NULL;
-    		return OGS_OK;
-    	}
         mongoc_database_destroy(self.db.database);
         self.db.database = NULL;
     }
