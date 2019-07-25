@@ -1,8 +1,9 @@
 ARG dist=ubuntu
-ARG tag=latest
+ARG tag=bionic
 FROM ${dist}:${tag}
 
 MAINTAINER Sukchan Lee <acetcom@gmail.com>
+MAINTAINER Harsha Chenji <chenji@ohio.edu>
 
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -22,6 +23,7 @@ RUN apt-get update && \
         libmongoc-dev \
         libbson-dev \
         libyaml-dev \
+        libcurl4-openssl-dev \
         build-essential \
         iproute2 \
         ca-certificates \
