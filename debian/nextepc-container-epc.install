@@ -1,0 +1,18 @@
+usr/lib/*/nextepc/*
+var/log/nextepc
+etc/nextepc/nextepc.conf
+support/logrotate/nextepc /etc/logrotate.d
+usr/bin/nextepc-epcd
+etc/nextepc/freeDiameter/cacert.pem
+etc/nextepc/freeDiameter/hss.conf
+etc/nextepc/freeDiameter/hss.cert.pem
+etc/nextepc/freeDiameter/hss.key.pem
+etc/nextepc/freeDiameter/mme.conf
+etc/nextepc/freeDiameter/mme.cert.pem
+etc/nextepc/freeDiameter/mme.key.pem
+etc/nextepc/freeDiameter/pcrf.conf
+etc/nextepc/freeDiameter/pcrf.cert.pem
+etc/nextepc/freeDiameter/pcrf.key.pem
+etc/nextepc/freeDiameter/pgw.conf
+etc/nextepc/freeDiameter/pgw.cert.pem
+etc/nextepc/freeDiameter/pgw.key.pem
