@@ -1,0 +1,15 @@
+usr/bin/nextepc-epcd
+etc/nextepc/freeDiameter/hss.conf
+etc/nextepc/freeDiameter/hss.cert.pem
+etc/nextepc/freeDiameter/hss.key.pem
+support/systemd/nextepc-epcd.service lib/systemd/system
+etc/nextepc/freeDiameter/mme.conf
+etc/nextepc/freeDiameter/mme.cert.pem
+etc/nextepc/freeDiameter/mme.key.pem
+etc/nextepc/freeDiameter/pcrf.conf
+etc/nextepc/freeDiameter/pcrf.cert.pem
+etc/nextepc/freeDiameter/pcrf.key.pem
+etc/nextepc/freeDiameter/pgw.conf
+etc/nextepc/freeDiameter/pgw.cert.pem
+etc/nextepc/freeDiameter/pgw.key.pem
+support/network/99-nextepc.* etc/systemd/network

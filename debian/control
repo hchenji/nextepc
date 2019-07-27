@@ -15,7 +15,7 @@ Build-Depends: debhelper (>= 9),
                libogslib-dev (>= 1.1.0),
                libgnutls28-dev,
                libgcrypt-dev,
-               libssl-dev,
+               libcurl4-openssl-dev,
                libidn11-dev,
                libmongoc-dev,
                libbson-dev,
@@ -145,3 +145,15 @@ Description: Debug symbols for NextEPC
  Packet Core, i.e. the core network of an LTE network.
  .
  This package contains debug symbols for NextEPC.
+
+Package: nextepc-epc
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         nextepc-core (= ${binary:Version})
+Description: Open Source based 3GPP EPC EPCD (All in one)
+ NextEPC is a C-language Open Source implementation of the 3GPP Evolved
+ Packet Core, i.e. the core network of an LTE network.
+ .
+ This package provides EPCD

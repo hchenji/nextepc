@@ -1,0 +1,20 @@
+[Unit]
+Description=NextEPC EPCD
+After=consul.service
+
+[Service]
+Type=simple
+
+User=nextepc
+Group=nextepc
+
+RuntimeDirectory=nextepc-epcd
+PIDFile=@LOCALSTATE_DIR@/run/nextepc-epcd/pid
+
+Restart=always
+ExecStart=@BIN_DIR@/nextepc-epcd -f @SYSCONF_DIR@/nextepc/nextepc.conf
+RestartSec=2
+RestartPreventExitStatus=1
+
+[Install]
+WantedBy=multi-user.target
