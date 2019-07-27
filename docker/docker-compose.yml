@@ -1,6 +1,12 @@
 version: '3'
 
 services:
+  dnet:
+    build:
+      context: ./build-dnet
+    image: wsrg/nextepc-dnet-base
+    command: /bin/bash -c "echo 'dnet base' services"
+
   base:
     build:
       context: ./${DIST-ubuntu}/${TAG-bionic}/base
