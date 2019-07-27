@@ -6,7 +6,12 @@ ARG arch=amd64
 
 WORKDIR /root
 
-COPY nextepc-core_0.5.0_${arch}.deb /root
-COPY nextepc-epc_0.5.0_${arch}.deb /root
+RUN apt-get update && apt-get install -y libbson-1.0-0 libcurl3 libgnutls30 libmongoc-1.0-0 libsctp1 libssl1.1 libyaml-0-2
 
-RUN dpkg -i /root/*.deb
+COPY libogs*_${arch}.deb /root/
+COPY nextepc-container-epc*_${arch}.deb /root/
+
+RUN dpkg -i /root/libogs*.deb && dpkg -i /root/nextepc-container-epc*.deb && mkdir /var/run/nextepc-epcd
+
+COPY nextepc.conf /etc/nextepc/nextepc.conf
+COPY setup.sh /root
