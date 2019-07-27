@@ -17,10 +17,10 @@ RUN	git clone --recursive https://github.com/$USER/$REPO
 RUN	cd nextepc && git checkout nextepc-consul && git submodule update
 ADD https://api.github.com/repos/$USER/$REPO/git/refs/heads/$BRANCH /root/nextepc-ver.json
 
-RUN	cd nextepc && autoreconf -fiv && ./configure \
+RUN	cd nextepc && git pull && autoreconf -fiv && ./configure \
         --prefix=/usr \
         --sysconfdir=/etc \
         --localstatedir=/var && \
-    make -j `nproc` install
+    make -j `nproc` install && make clean
 
 COPY nextepc.conf /etc/nextepc/nextepc.conf

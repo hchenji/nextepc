@@ -1,8 +1,10 @@
 ARG dist=debian
-ARG tag=stable
+ARG tag=stretch
 FROM ${dist}:${tag}
 
 MAINTAINER Sukchan Lee <acetcom@gmail.com>
+MAINTAINER Harsha Chenji <chenji@ohio.edu>
+
 
 ARG tag=stable
 #RUN apt-get update && \
@@ -15,7 +17,7 @@ ARG tag=stable
 #    fi
 
 RUN apt-get update && \
-    apt-get upgrade -y && \
+#    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         autoconf \
         automake \
@@ -32,7 +34,9 @@ RUN apt-get update && \
         libmongoc-dev \
         libbson-dev \
         libyaml-dev \
-        build-essential \
+        libcurl4-openssl-dev \
+        make \
+#       build-essential \
         iproute2 \
         ca-certificates \
         netbase \
