@@ -12,6 +12,8 @@ services:
       DB_URI: consul://10.10.10.67:8500/nextepc
     devices:
       - "/dev/net/tun:/dev/net/tun"
+    volumes:
+      - ./pgwtun_setup.sh:/root/setup.sh
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
     hostname: nextepc-run
