@@ -566,6 +566,10 @@ int pgw_context_parse_config()
                 } else if (!strcmp(pgw_key, "ue_pool")) {
                     ogs_yaml_iter_t ue_pool_array, ue_pool_iter;
                     ogs_yaml_iter_recurse(&pgw_iter, &ue_pool_array);
+
+                    bool ip4_found = false;
+                    bool ip6_found = false;
+
                     do {
                         pgw_subnet_t *subnet = NULL;
                         const char *ipstr = NULL;
@@ -598,8 +602,30 @@ int pgw_context_parse_config()
                                     (char *)ogs_yaml_iter_value(&ue_pool_iter);
                                 if (v) {
                                     ipstr = (const char *)strsep(&v, "/");
+
+
+                                    if (!ip4_found && ogs_env_get("NEPC_PGW_IP4")) {
+                                        ipstr = ogs_env_get("NEPC_PGW_IP4");
+                                    } else if (ip4_found && !ip6_found && ogs_env_get("NEPC_PGW_IP6")) {
+                                        ipstr = ogs_env_get("NEPC_PGW_IP6");
+                                    }
+
+//                                    printf("ipstr is %s\n", ipstr);
+
                                     if (ipstr) {
                                         mask_or_numbits = (const char *)v;
+
+                                        if (!ip4_found && ogs_env_get("NEPC_PGW_MASK4")) {
+											mask_or_numbits = ogs_env_get("NEPC_PGW_MASK4");
+											ip4_found = true;
+										}
+
+                                        if (!ip4_found && !ip6_found && ogs_env_get("NEPC_PGW_MASK6")) {
+											mask_or_numbits = ogs_env_get("NEPC_PGW_MASK6");
+											ip6_found=true;
+										}
+
+//                                    	printf("mask is %s\n", mask_or_numbits);
                                     }
                                 }
                             } else if (!strcmp(ue_pool_key, "apn")) {
@@ -646,6 +672,13 @@ int pgw_context_parse_config()
                                     ogs_warn("Ignore DNS : %s", v);
                                 else if (self.dns[0]) self.dns[1] = v;
                                 else self.dns[0] = v;
+
+                                /* Override configuration if environment variable is existed */
+                                if (ogs_env_get("NEPC_PGW_DNS4")) {
+                                    self.dns[0] = ogs_env_get("NEPC_PGW_DNS4");
+                                    self.dns[1] = ogs_env_get("NEPC_PGW_DNS4");
+                                }
+
                             }
                             else if (ipsub.family == AF_INET6) {
                                 if (self.dns6[0] && self.dns6[1])

@@ -154,6 +154,10 @@ static int tun_set_ipv4(char *ifname,
 	mask.sin_len = sizeof(mask);
 	(void)memcpy(&ifa.ifra_mask, &mask, sizeof(ifa.ifra_mask));
 
+//	char buffer[20];
+//	inet_ntop(AF_INET, &(addr.sin_addr), buffer, 20);
+//	printf("address:%s\n",buffer);
+
 	if (ioctl(fd, SIOCAIFADDR, &ifa) == -1) {
         ogs_log_message(OGS_LOG_ERROR, ogs_socket_errno,
                 "Can't IP address : dev[%s]", ifname);

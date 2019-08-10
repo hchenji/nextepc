@@ -295,6 +295,7 @@ int pgw_gtp_open()
     for (subnet = pgw_subnet_first(); 
             subnet; subnet = pgw_subnet_next(subnet)) {
         ogs_assert(subnet->dev);
+//        printf("setting ip address for tun as %0x\n", subnet->gw.sub[0]);
         rc = ogs_tun_set_ip(subnet->dev->ifname, &subnet->gw, &subnet->sub);
         if (rc != OGS_OK) {
             ogs_error("ogs_tun_set_ip(dev:%s) failed", subnet->dev->ifname);
