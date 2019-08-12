@@ -4,20 +4,33 @@ services:
   dnet:
     build:
       context: ./build-dnet
-    image: wsrg/nextepc-dnet
+    image: wsrg/nextepc-dnet:${TAG-amd64}
     network_mode: "host"
     cap_add:
       - NET_ADMIN
     environment:
-      DB_URI: consul://10.10.10.67:8500/nextepc
+      DB_URI: "consul://10.10.10.67:8500/nextepc"
+      NEPC_PGW_DNS4: 10.10.10.67
+      NEPC_PGW_IP4: 172.28.0.1
+      NEPC_PGW_MASK4: 24
+      NEPC_PGW_IP6: ca09::1
+      NEPC_PGW_MASK6: 64
+      NEPC_MME_NETNAME_SHORT: dnet
+      NEPC_MME_NETNAME: dnet
+      NEPC_MME_S1AP_ADDR: 192.168.44.10
+      NEPC_MME_GTPC_ADDR: 127.0.0.2
+      NEPC_SGW_GTPC_ADDR: 127.0.0.6
+      NEPC_SGW_GTPU_ADDR: 192.168.44.10
+      NEPC_PGW_GTPC_ADDR: 127.0.0.3
+      NEPC_PGW_GTPU_ADDR: 127.0.0.3
+    volumes:
+      - ./freeDiameter:/etc/nextepc/freeDiameter
     devices:
       - "/dev/net/tun:/dev/net/tun"
-    volumes:
-      - ./pgwtun_setup.sh:/root/setup.sh
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
     hostname: nextepc-run
-    command: /bin/bash -c "/root/setup.sh; /usr/bin/nextepc-epcd"
+    command: /bin/bash -c "/root/settun.sh; /usr/bin/nextepc-epcd"
 #    command: /bin/bash -c "echo 'dnet base' services"
     # command: /bin/bash
 

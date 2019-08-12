@@ -471,6 +471,11 @@ int mme_context_parse_config()
                                     ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
+
+                                    // hack - doesnt support more than one hostname
+                                    if (ogs_env_get("NEPC_MME_S1AP_ADDR")) {
+                                    	hostname[num-1] = ogs_env_get("NEPC_MME_S1AP_ADDR");
+                                    }
                                 } while (
                                     ogs_yaml_iter_type(&hostname_iter) ==
                                         YAML_SEQUENCE_NODE);
@@ -594,6 +599,11 @@ int mme_context_parse_config()
                                     ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
+
+                                    // hack - doesnt support more than one hostname
+                                    if (ogs_env_get("NEPC_MME_GTPC_ADDR")) {
+                                    	hostname[num-1] = ogs_env_get("NEPC_MME_GTPC_ADDR");
+                                    }
                                 } while (
                                     ogs_yaml_iter_type(&hostname_iter) ==
                                         YAML_SEQUENCE_NODE);
@@ -1041,8 +1051,12 @@ int mme_context_parse_config()
                         if (!strcmp(network_name_key, "full")) {  
                             nas_network_name_t *network_full_name =
                                 &self.full_name;
-                            const char *c_network_name =
-                                ogs_yaml_iter_value(&network_name_iter);
+                            const char *c_network_name = ogs_yaml_iter_value(&network_name_iter);
+
+							if (ogs_env_get("NEPC_MME_NETNAME")) {
+								c_network_name = ogs_env_get("NEPC_MME_NETNAME");
+							}
+
                             uint8_t size = strlen(c_network_name);
                             uint8_t i;
                             for (i = 0;i<size;i++) {
@@ -1059,6 +1073,11 @@ int mme_context_parse_config()
                                 &self.short_name;
                             const char *c_network_name =
                                 ogs_yaml_iter_value(&network_name_iter);
+
+							if (ogs_env_get("NEPC_MME_NETNAME_SHORT")) {
+								c_network_name = ogs_env_get("NEPC_MME_NETNAME_SHORT");
+							}
+
                             uint8_t size = strlen(c_network_name);
                             uint8_t i;
                             for (i = 0;i<size;i++) {

@@ -374,6 +374,12 @@ int pgw_context_parse_config()
                                     ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
+
+									// hack - doesnt support more than one hostname
+									if (ogs_env_get("NEPC_PGW_GTPC_ADDR")) {
+										hostname[num-1] = ogs_env_get("NEPC_PGW_GTPC_ADDR");
+									}
+
                                 } while (
                                     ogs_yaml_iter_type(&hostname_iter) ==
                                         YAML_SEQUENCE_NODE);
@@ -498,6 +504,11 @@ int pgw_context_parse_config()
                                     ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
+
+									// hack - doesnt support more than one hostname
+									if (ogs_env_get("NEPC_PGW_GTPU_ADDR")) {
+										hostname[num-1] = ogs_env_get("NEPC_PGW_GTPU_ADDR");
+									}
                                 } while (
                                     ogs_yaml_iter_type(&hostname_iter) ==
                                         YAML_SEQUENCE_NODE);
