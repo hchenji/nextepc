@@ -7,38 +7,151 @@ services:
       args:
         arch: ${TAG-amd64}
     image: wsrg/nextepc-dnet:${TAG-amd64}
-    network_mode: "host"
+    # network_mode: "host"
+    networks:
+      - dnet
     cap_add:
       - NET_ADMIN
+    ports:
+      - "192.168.44.10:36412:36412/sctp"
+      - "192.168.44.10:2152:2152/udp"
     environment:
       DB_URI: "consul://10.10.10.67:8500/nextepc"
       NEPC_PGW_DNS4: 10.10.10.67
       NEPC_PGW_IP4: 172.28.0.1
       NEPC_PGW_MASK4: 24
-      NEPC_PGW_IP6: ca09::1
-      NEPC_PGW_MASK6: 64
+      # NEPC_PGW_IP6: ca09::1
+      # NEPC_PGW_MASK6: 64
       NEPC_MME_NETNAME_SHORT: dnet
       NEPC_MME_NETNAME: dnet
-      NEPC_MME_S1AP_ADDR: 192.168.44.10
+      # NEPC_MME_S1AP_ADDR: 192.168.80.3
       NEPC_MME_GTPC_ADDR: 127.0.0.2
       NEPC_SGW_GTPC_ADDR: 127.0.0.6
-      NEPC_SGW_GTPU_ADDR: 192.168.44.10
+      # NEPC_SGW_GTPU_ADDR: 192.168.80.3
       NEPC_PGW_GTPC_ADDR: 127.0.0.3
       NEPC_PGW_GTPU_ADDR: 127.0.0.3
     volumes:
-      - ./freeDiameter:/etc/nextepc/freeDiameter
+      - ./freeDiameter.allin1:/etc/nextepc/freeDiameter
+      - ./build-dnet/nextepc.allin1.conf:/etc/nextepc/nextepc.conf
     devices:
       - "/dev/net/tun:/dev/net/tun"
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
-    hostname: nextepc-run
-    command: /bin/bash -c "/root/settun.sh; /usr/bin/nextepc-epcd"
-#    command: /bin/bash -c "echo 'dnet base' services"
+    command: /bin/bash -c "env; /root/settun.sh; ip a; /usr/bin/nextepc-epcd"
+   # command: /bin/bash -c "echo 'dnet base' services"
     # command: /bin/bash
 
   mme:
     depends_on:
-      - dnet
-    image: wsrg/nextepc-dnet
-    command: /bin/bash -c "/usr/bin/nextepc-mmed"
+      - pgw
+    image: wsrg/nextepc-dnet:${TAG-amd64}
+    # network_mode: "dnet"
+    networks:
+      dnet:
+        aliases:
+          - mme.localdomain
+    # domainname: mme.localdomain
+    # hostname: mme.localdomain
+    ports:
+      - "36412:36412/sctp"
+      # - "2152:2152/udp"
+    environment:
+      DB_URI: "consul://10.10.10.67:8500/nextepc"
+      NEPC_MME_NETNAME_SHORT: dnet
+      NEPC_MME_NETNAME: dnet
+      # NEPC_MME_S1AP_ADDR: 0.0.0.0
+      # NEPC_MME_GTPC_ADDR: 127.0.0.2
+      # NEPC_SGW_GTPC_ADDR: 127.0.0.6
+      # NEPC_SGW_GTPU_ADDR: 0.0.0.0
+      # NEPC_PGW_GTPC_ADDR: 127.0.0.3
+      # NEPC_PGW_GTPU_ADDR: 127.0.0.3
+    command: /bin/bash -c "/usr/bin/nextepc-mmed -f /etc/nextepc/mme.conf"
+    # command: /bin/bash -c "sleep 1 && ping hss.localdomain"
+
+    # hostname: "mme"
+    volumes:
+      - ./freeDiameter:/etc/nextepc/freeDiameter
+      - ./confs/mme.conf:/etc/nextepc/mme.conf
+
+  hss:
+    environment:
+      DB_URI: "consul://10.10.10.67:8500/nextepc"
+    image: wsrg/nextepc-dnet:${TAG-amd64}
+    # network_mode: "dnet"
+    networks:
+      dnet:
+        aliases:
+          - hss.localdomain
+    # expose:
+      # - "3868/tcp"
+    command: /bin/bash -c "/usr/bin/nextepc-hssd -f /etc/nextepc/hss.conf"
+    # command: /bin/bash -c "ping mme"
+    volumes:
+      - ./freeDiameter:/etc/nextepc/freeDiameter
+      - ./confs/hss.conf:/etc/nextepc/hss.conf
+
+    
+  sgw:
+    image: wsrg/nextepc-dnet:${TAG-amd64}
+    # network_mode: "dnet"
+    networks:
+      dnet:
+        aliases:
+          - sgw.localdomain
+    ports:
+      - "2152:2152/udp"
+    command: /bin/bash -c "/usr/bin/nextepc-sgwd -f /etc/nextepc/sgw.conf"
+    # command: /bin/bash -c "ping mme"
+    # hostname: hss
+    volumes:
+      - ./freeDiameter:/etc/nextepc/freeDiameter
+      - ./confs/sgw.conf:/etc/nextepc/sgw.conf
   
+  pcrf:
+    environment:
+      DB_URI: "consul://10.10.10.67:8500/nextepc"
+    image: wsrg/nextepc-dnet:${TAG-amd64}
+    # network_mode: "dnet"
+    networks:
+      dnet:
+        aliases:
+          - pcrf.localdomain
+    command: /bin/bash -c "/usr/bin/nextepc-pcrfd -f /etc/nextepc/pcrf.conf"
+    # command: /bin/bash -c "ping mme"
+    # hostname: hss
+    volumes:
+      - ./freeDiameter:/etc/nextepc/freeDiameter
+      - ./confs/pcrf.conf:/etc/nextepc/pcrf.conf
+
+
+  pgw:
+    depends_on:
+      - pcrf
+    image: wsrg/nextepc-dnet:${TAG-amd64}
+    # network_mode: "host"
+    environment:
+      NEPC_PGW_DNS4: 10.10.10.67
+      NEPC_PGW_IP4: 172.28.0.1
+      NEPC_PGW_MASK4: 24
+      # NEPC_PGW_IP6: ca09::1
+      # NEPC_PGW_MASK6: 64
+    cap_add:
+      - NET_ADMIN
+    networks:
+      dnet:
+        aliases:
+          - pgw.localdomain
+      # - host 
+    command: /bin/bash -c "/root/settun.sh; /usr/bin/nextepc-pgwd -f /etc/nextepc/pgw.conf"
+    # command: /bin/bash
+    # hostname: hss
+    devices:
+      - "/dev/net/tun:/dev/net/tun"
+    volumes:
+      - ./freeDiameter:/etc/nextepc/freeDiameter
+      - ./confs/pgw.conf:/etc/nextepc/pgw.conf
+
+
+networks:
+  dnet:
+    driver: bridge

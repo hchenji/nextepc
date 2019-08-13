@@ -8,6 +8,8 @@ WORKDIR /root
 
 RUN apt-get update && apt-get install -y libbson-1.0-0 libcurl3 libgnutls30 libmongoc-1.0-0 libsctp1 libssl1.1 libyaml-0-2 iproute2
 
+RUN apt-get install -y iputils-ping dnsutils
+
 COPY libogs*_${arch}.deb /root/
 COPY nextepc-container-epc*_${arch}.deb /root/
 

@@ -451,6 +451,28 @@ int s1ap_build_initial_context_setup_request(
 
             rv = s1ap_ip_to_BIT_STRING(
                     &bearer->sgw_s1u_ip, &e_rab->transportLayerAddress);
+
+            //	hack: if s1u of SGW is on a NAT, then replace with external IP
+            if (ogs_env_get("NEPC_MME_SGW_TLADDR")) {
+				char buf[OGS_ADDRSTRLEN];
+				struct sockaddr_in antelope;
+				inet_aton(ogs_env_get("NEPC_MME_SGW_TLADDR"), &antelope.sin_addr); // store IP in antelope
+//				printf("sgw s1u ip from env is %0x\n", antelope.sin_addr.s_addr);
+//				printf("buf size is %zu\n", e_rab->transportLayerAddress.size);
+//				ogs_info("    s1u ip from env is %s", INET_NTOP(&antelope.sin_addr.s_addr, buf));
+//				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[3]);
+//				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[2]);
+//				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[1]);
+//				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[0]);
+
+				memcpy(e_rab->transportLayerAddress.buf, &antelope.sin_addr.s_addr, IPV4_LEN);
+
+//				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[3]);
+//				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[2]);
+//				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[1]);
+//				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[0]);
+            }
+
             ogs_assert(rv == OGS_OK);
             s1ap_uint32_to_OCTET_STRING(bearer->sgw_s1u_teid, &e_rab->gTP_TEID);
 
