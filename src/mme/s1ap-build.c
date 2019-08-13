@@ -459,7 +459,7 @@ int s1ap_build_initial_context_setup_request(
 				inet_aton(ogs_env_get("NEPC_MME_SGW_TLADDR"), &antelope.sin_addr); // store IP in antelope
 //				printf("sgw s1u ip from env is %0x\n", antelope.sin_addr.s_addr);
 //				printf("buf size is %zu\n", e_rab->transportLayerAddress.size);
-//				ogs_info("    s1u ip from env is %s", INET_NTOP(&antelope.sin_addr.s_addr, buf));
+				ogs_info("    s1u ip from env is %s", INET_NTOP(&antelope.sin_addr.s_addr, buf));
 //				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[3]);
 //				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[2]);
 //				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[1]);
