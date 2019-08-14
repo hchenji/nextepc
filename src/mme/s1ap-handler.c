@@ -496,9 +496,21 @@ void s1ap_handle_initial_context_setup_response(
         memcpy(&bearer->enb_s1u_teid, e_rab->gTP_TEID.buf, 
                 sizeof(bearer->enb_s1u_teid));
         bearer->enb_s1u_teid = ntohl(bearer->enb_s1u_teid);
-        rv = s1ap_BIT_STRING_to_ip(
-                &e_rab->transportLayerAddress, &bearer->enb_s1u_ip);
-        ogs_assert(rv == OGS_OK);
+
+        //	hack: if eNB is on a NAT, then replace with external IP
+        //	overwrite TLAddress with the one from env
+		if (ogs_env_get("NEPC_MME_ENB_TLADDR")) {
+			char buf[OGS_ADDRSTRLEN];
+			struct sockaddr_in antelope;
+			inet_aton(ogs_env_get("NEPC_MME_ENB_TLADDR"), &antelope.sin_addr); // store IP in antelope
+			ogs_info("enb ip env override is %s", INET_NTOP(&antelope.sin_addr.s_addr, buf));
+			memcpy(e_rab->transportLayerAddress.buf, &antelope.sin_addr.s_addr, IPV4_LEN);
+		}
+
+		rv = s1ap_BIT_STRING_to_ip(
+				&e_rab->transportLayerAddress, &bearer->enb_s1u_ip);
+
+		ogs_assert(rv == OGS_OK);
 
         ogs_debug("    EBI[%d] ENB-S1U-TEID[%d]",
                 bearer->ebi, bearer->enb_s1u_teid);

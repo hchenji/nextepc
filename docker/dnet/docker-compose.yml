@@ -13,7 +13,7 @@ services:
       # - "192.168.44.10:2152:2152/udp"
 #      - "192.168.44.10:2152:2152/tcp"
     environment:
-      DB_URI: "consul://10.10.10.67:8500/nextepc"
+      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
       NEPC_PGW_DNS4: 10.10.10.67
       NEPC_PGW_IP4: 172.28.0.1
       NEPC_PGW_MASK4: 24
@@ -28,6 +28,7 @@ services:
       NEPC_PGW_GTPC_ADDR: 127.0.0.3
       NEPC_PGW_GTPU_ADDR: 127.0.0.3
       NEPC_MME_SGW_TLADDR: 192.168.44.10
+      NEPC_MME_ENB_TLADDR: 1.1.1.1
     volumes:
       - ./freeDiameter.allin1:/etc/nextepc/freeDiameter
       - ./build-dnet/nextepc.allin1.conf:/etc/nextepc/nextepc.conf
@@ -56,7 +57,7 @@ services:
       # frontend:
 
     environment:
-      DB_URI: "consul://10.10.10.67:8500/nextepc"
+      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
       NEPC_MME_NETNAME_SHORT: dnet
       NEPC_MME_NETNAME: dnet
       NEPC_MME_S1AP_ADDR: 192.168.44.10
@@ -64,6 +65,7 @@ services:
       NEPC_SGW_GTPC_ADDR: sgw.localdomain
       NEPC_PGW_GTPC_ADDR: pgw.localdomain
       NEPC_MME_SGW_TLADDR: 192.168.44.10
+      NEPC_MME_ENB_TLADDR: 1.1.1.1
     command: /bin/bash -c "/usr/bin/nextepc-mmed -f /etc/nextepc/mme.conf"
     volumes:
       - ./freeDiameter:/etc/nextepc/freeDiameter
@@ -78,7 +80,7 @@ services:
 #hss is on br-dnet
   hss:
     environment:
-      DB_URI: "consul://10.10.10.67:8500/nextepc"
+      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
     image: wsrg/nextepc-dnet:${TAG-amd64}
     # network_mode: "dnet"
     networks:
@@ -116,7 +118,7 @@ services:
 #pcrf is on br-dnet
   pcrf:
     environment:
-      DB_URI: "consul://10.10.10.67:8500/nextepc"
+      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
     image: wsrg/nextepc-dnet:${TAG-amd64}
     networks:
       default:
