@@ -617,7 +617,9 @@ int pgw_context_parse_config()
 
                                     if (!ip4_found && ogs_env_get("NEPC_PGW_IP4")) {
                                         ipstr = ogs_env_get("NEPC_PGW_IP4");
-                                    } else if (ip4_found && !ip6_found && ogs_env_get("NEPC_PGW_IP6")) {
+										ogs_info("env var override ipstr with %s\n", ipstr);
+
+									} else if (ip4_found && !ip6_found && ogs_env_get("NEPC_PGW_IP6")) {
                                         ipstr = ogs_env_get("NEPC_PGW_IP6");
                                     }
 
@@ -628,6 +630,8 @@ int pgw_context_parse_config()
 
                                         if (!ip4_found && ogs_env_get("NEPC_PGW_MASK4")) {
 											mask_or_numbits = ogs_env_get("NEPC_PGW_MASK4");
+											ogs_info("env var override mask with %s\n", mask_or_numbits);
+
 											ip4_found = true;
 										}
 
@@ -650,6 +654,7 @@ int pgw_context_parse_config()
                         if (ipstr && mask_or_numbits) {
                             subnet = pgw_subnet_add(
                                     ipstr, mask_or_numbits, apn, dev);
+                            ogs_info("adding subnet with ipstr %s mask %s apn %s dev %s\n", ipstr, mask_or_numbits, apn, dev);
                             ogs_assert(subnet);
                         } else {
                             ogs_warn("Ignore : addr(%s/%s), apn(%s)",
