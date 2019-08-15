@@ -19,6 +19,7 @@
 
 #include "nas/nas-message.h"
 #include "mme-event.h"
+#include "mme-sm.h"
 
 #include "mme-kdf.h"
 #include "nas-security.h"
@@ -69,22 +70,21 @@ int emm_handle_attach_request(
     /*
      * ATTACH_REQUEST
      *   Clear EBI generator
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      *
      * TAU_REQUEST
-     *   Clear Paging Timer and Message
+     *   Clear Timer and Message
      *
      * SERVICE_REQUEST
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      *
      * EXTENDED_SERVICE_REQUEST
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      */
+    CLEAR_MME_UE_ALL_TIMERS(mme_ue);
+
     CLEAR_EPS_BEARER_ID(mme_ue);
-    CLEAR_PAGING_INFO(mme_ue);
+    CLEAR_SERVICE_INDICATOR(mme_ue);
     if (SECURITY_CONTEXT_IS_VALID(mme_ue)) {
         mme_kdf_enb(mme_ue->kasme, mme_ue->ul_count.i32, mme_ue->kenb);
         mme_kdf_nh(mme_ue->kasme, mme_ue->kenb, mme_ue->nh);
@@ -139,6 +139,17 @@ int emm_handle_attach_request(
         memcpy(&mme_ue->ms_network_capability, 
                 &attach_request->ms_network_capability,
                 sizeof(attach_request->ms_network_capability));
+    }
+
+    if (mme_selected_int_algorithm(mme_ue) == NAS_SECURITY_ALGORITHMS_EIA0) {
+        ogs_warn("Encrypt[0x%x] can be skipped with EEA0, "
+            "but Integrity[0x%x] cannot be bypassed with EIA0",
+            mme_selected_enc_algorithm(mme_ue), 
+            mme_selected_int_algorithm(mme_ue));
+        nas_send_attach_reject(mme_ue,
+            EMM_CAUSE_UE_SECURITY_CAPABILITIES_MISMATCH,
+            ESM_CAUSE_PROTOCOL_ERROR_UNSPECIFIED);
+        return OGS_ERROR;
     }
 
     switch (eps_mobile_identity->imsi.type) {
@@ -362,21 +373,19 @@ int emm_handle_service_request(
     /*
      * ATTACH_REQUEST
      *   Clear EBI generator
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      *
      * TAU_REQUEST
-     *   Clear Paging Timer and Message
+     *   Clear Timer and Message
      *
      * SERVICE_REQUEST
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      *
      * EXTENDED_SERVICE_REQUEST
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      */
-    CLEAR_PAGING_INFO(mme_ue);
+    CLEAR_MME_UE_ALL_TIMERS(mme_ue);
+
     if (SECURITY_CONTEXT_IS_VALID(mme_ue)) {
         mme_kdf_enb(mme_ue->kasme, mme_ue->ul_count.i32, mme_ue->kenb);
         mme_kdf_nh(mme_ue->kasme, mme_ue->kenb, mme_ue->nh);
@@ -422,21 +431,20 @@ int emm_handle_tau_request(
     /*
      * ATTACH_REQUEST
      *   Clear EBI generator
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      *
      * TAU_REQUEST
-     *   Clear Paging Timer and Message
+     *   Clear Timer and Message
      *
      * SERVICE_REQUEST
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      *
      * EXTENDED_SERVICE_REQUEST
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      */
-    CLEAR_PAGING_INFO(mme_ue);
+    CLEAR_MME_UE_ALL_TIMERS(mme_ue);
+
+    CLEAR_SERVICE_INDICATOR(mme_ue);
     if (BEARER_CONTEXT_IS_ACTIVE(mme_ue))
         ogs_debug("    Bearer-Active");
     else
@@ -554,26 +562,18 @@ int emm_handle_extended_service_request(
     /*
      * ATTACH_REQUEST
      *   Clear EBI generator
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      *
      * TAU_REQUEST
-     *   Clear Paging Timer and Message
+     *   Clear Timer and Message
      *
      * SERVICE_REQUEST
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      *
      * EXTENDED_SERVICE_REQUEST
-     *   Clear Paging Timer and Message
-     *   Update KeNB
+     *   Clear Timer and Message
      */
-    CLEAR_PAGING_INFO(mme_ue);
-    if (SECURITY_CONTEXT_IS_VALID(mme_ue)) {
-        mme_kdf_enb(mme_ue->kasme, mme_ue->ul_count.i32, mme_ue->kenb);
-        mme_kdf_nh(mme_ue->kasme, mme_ue->kenb, mme_ue->nh);
-        mme_ue->nhcc = 1;
-    }
+    CLEAR_MME_UE_ALL_TIMERS(mme_ue);
 
     ogs_debug("    OLD TAI[PLMN_ID:%06x,TAC:%d]",
             plmn_id_hexdump(&mme_ue->tai.plmn_id), mme_ue->tai.tac);

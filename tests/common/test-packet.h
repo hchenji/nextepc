@@ -48,6 +48,8 @@ ogs_pkbuf_t *testenb_gtpu_read(ogs_socknode_t *node);
 int testenb_gtpu_send(ogs_socknode_t *node, ogs_pkbuf_t *sendbuf);
 void testenb_gtpu_close(ogs_socknode_t *node);
 
+int tests1ap_build_invalid_packet(ogs_pkbuf_t **pkbuf, int i);
+
 int tests1ap_build_setup_req(
         ogs_pkbuf_t **pkbuf, S1AP_ENB_ID_PR present, uint32_t enb_id,
         int tac, uint16_t mcc, uint16_t mnc, uint16_t mnc_len);
@@ -130,6 +132,8 @@ int tests1ap_build_handover_cancel(ogs_pkbuf_t **pkbuf, int i);
 
 int tests1ap_build_s1_reset(ogs_pkbuf_t **pkbuf, int i);
 
+int tests1ap_build_uplink_nas_transport(ogs_pkbuf_t **pkbuf, int i);
+
 int testgtpu_build_ping(ogs_pkbuf_t **sendbuf,
         const char *src_ip, const char *dst_ip);
 int testgtpu_build_slacc_rs(ogs_pkbuf_t **sendbuf, int i);
@@ -139,6 +143,9 @@ int testsgsap_location_update_reject(ogs_pkbuf_t **pkbuf, int i);
 int testsgsap_imsi_detach_ack(ogs_pkbuf_t **pkbuf, int i);
 int testsgsap_paging_request(ogs_pkbuf_t **pkbuf, int i);
 int testsgsap_reset_indication(ogs_pkbuf_t **pkbuf, int i);
+int testsgsap_release_request(ogs_pkbuf_t **pkbuf, int i);
+int testsgsap_downlink_unitdata(ogs_pkbuf_t **pkbuf, int i);
+int testsgsap_mm_information_request(ogs_pkbuf_t **pkbuf, int i);
 
 #ifdef __cplusplus
 }

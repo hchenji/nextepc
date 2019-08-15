@@ -24,6 +24,8 @@
 #include "s1ap-path.h"
 #include "nas-path.h"
 #include "mme-gtp-path.h"
+#include "sgsap-types.h"
+#include "sgsap-path.h"
 
 #include "mme-s11-build.h"
 #include "s1ap-build.h"
@@ -475,7 +477,6 @@ void s1ap_handle_initial_context_setup_response(
         S1AP_E_RABSetupItemCtxtSUResIEs_t *ie2 = NULL;
         S1AP_E_RABSetupItemCtxtSURes_t *e_rab = NULL;
 
-        mme_sess_t *sess = NULL;
         mme_bearer_t *bearer = NULL;
 
         ie2 = (S1AP_E_RABSetupItemCtxtSUResIEs_t *)
@@ -485,13 +486,7 @@ void s1ap_handle_initial_context_setup_response(
         e_rab = &ie2->value.choice.E_RABSetupItemCtxtSURes;
         ogs_assert(e_rab);
 
-        sess = mme_sess_find_by_ebi(mme_ue, e_rab->e_RAB_ID);
-        if (!sess) {
-            ogs_warn("Session context has already been removed");
-            continue;
-        }
-
-        bearer = mme_default_bearer_in_sess(sess);
+        bearer = mme_bearer_find_by_ue_ebi(mme_ue, e_rab->e_RAB_ID);
         ogs_assert(bearer);
         memcpy(&bearer->enb_s1u_teid, e_rab->gTP_TEID.buf, 
                 sizeof(bearer->enb_s1u_teid));
@@ -526,6 +521,12 @@ void s1ap_handle_initial_context_setup_response(
             ogs_assert(rv == OGS_OK);
         }
     }
+
+    if (SMS_SERVICE_INDICATOR(mme_ue)) {
+        sgsap_send_service_request(mme_ue, SGSAP_EMM_CONNECTED_MODE);
+    }
+
+    CLEAR_SERVICE_INDICATOR(mme_ue);
 }
 
 void s1ap_handle_initial_context_setup_failure(
@@ -581,7 +582,7 @@ void s1ap_handle_initial_context_setup_failure(
     if (enb_ue == NULL) {
         ogs_warn("Initial context setup failure : "
                 "cannot find eNB-UE-S1AP-ID[%d]", (int)*ENB_UE_S1AP_ID);
-        return;
+        goto cleanup;
     }
     mme_ue = enb_ue->mme_ue;
 
@@ -610,6 +611,9 @@ void s1ap_handle_initial_context_setup_failure(
         rv = mme_send_delete_session_or_ue_context_release(mme_ue, enb_ue);
         ogs_assert(rv == OGS_OK);
     }
+
+cleanup:
+    CLEAR_SERVICE_INDICATOR(mme_ue);
 }
 
 void s1ap_handle_ue_context_modification_response(
@@ -662,6 +666,7 @@ void s1ap_handle_ue_context_modification_response(
     ogs_debug("    ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
             enb_ue->enb_ue_s1ap_id, enb_ue->mme_ue_s1ap_id);
 
+    CLEAR_SERVICE_INDICATOR(mme_ue);
 }
 
 void s1ap_handle_ue_context_modification_failure(
@@ -678,6 +683,7 @@ void s1ap_handle_ue_context_modification_failure(
     S1AP_Cause_t *Cause = NULL;
 
     enb_ue_t *enb_ue = NULL;
+    mme_ue_t *mme_ue = NULL;
 
     ogs_assert(enb);
     ogs_assert(enb->sock);
@@ -715,13 +721,18 @@ void s1ap_handle_ue_context_modification_failure(
     if (enb_ue == NULL) {
         ogs_warn("Initial context setup failure : "
                 "cannot find eNB-UE-S1AP-ID[%d]", (int)*ENB_UE_S1AP_ID);
-        return;
+        goto cleanup;
     }
 
     ogs_debug("    ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
             enb_ue->enb_ue_s1ap_id, enb_ue->mme_ue_s1ap_id);
     ogs_debug("    Cause[Group:%d Cause:%d]",
             Cause->present, (int)Cause->choice.radioNetwork);
+
+cleanup:
+    mme_ue = enb_ue->mme_ue;
+    ogs_assert(mme_ue);
+    CLEAR_SERVICE_INDICATOR(mme_ue);
 }
 
 
@@ -922,6 +933,7 @@ void s1ap_handle_ue_context_release_request(
         }
     } else {
         ogs_debug("    S1 Context Not Associated");
+        CLEAR_ENB_UE_TIMER(enb_ue->t_ue_context_release);
         rv = s1ap_send_ue_context_release_command(enb_ue, 
                 S1AP_Cause_PR_nas, S1AP_CauseNas_normal_release,
                 S1AP_UE_CTX_REL_NO_ACTION, 0);
@@ -983,6 +995,7 @@ void s1ap_handle_ue_context_release_complete(
         ogs_assert(rv == OGS_OK);
         return;
     }
+
     mme_ue = enb_ue->mme_ue;
 
     ogs_debug("    ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
@@ -1624,6 +1637,7 @@ void s1ap_handle_handover_failure(mme_enb_t *enb, s1ap_message_t *message)
     rv = s1ap_send_handover_preparation_failure(source_ue, Cause);
     ogs_assert(rv == OGS_OK);
 
+    CLEAR_ENB_UE_TIMER(target_ue->t_ue_context_release);
     rv = s1ap_send_ue_context_release_command(
         target_ue, S1AP_Cause_PR_radioNetwork,
         S1AP_CauseRadioNetwork_ho_failure_in_target_EPC_eNB_or_target_system,
@@ -1696,6 +1710,7 @@ void s1ap_handle_handover_cancel(mme_enb_t *enb, s1ap_message_t *message)
     rv = s1ap_send_handover_cancel_ack(source_ue);
     ogs_assert(rv == OGS_OK);
 
+    CLEAR_ENB_UE_TIMER(target_ue->t_ue_context_release);
     rv = s1ap_send_ue_context_release_command(
             target_ue, S1AP_Cause_PR_radioNetwork,
             S1AP_CauseRadioNetwork_handover_cancelled,

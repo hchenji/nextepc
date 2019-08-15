@@ -20,6 +20,7 @@
 #include "ogs-sctp.h"
 
 #include "mme-event.h"
+#include "mme-timer.h"
 
 #include "nas-security.h"
 #include "nas-path.h"
@@ -95,13 +96,10 @@ int s1ap_send_to_enb(mme_enb_t *enb, ogs_pkbuf_t *pkbuf, uint16_t stream_no)
 int s1ap_send_to_enb_ue(enb_ue_t *enb_ue, ogs_pkbuf_t *pkbuf)
 {
     mme_enb_t *enb = NULL;
-    mme_ue_t *mme_ue = NULL;
 
     ogs_assert(enb_ue);
     enb = enb_ue->enb;
     ogs_assert(enb);
-    mme_ue = enb_ue->mme_ue;
-    ogs_assert(mme_ue);
 
     return s1ap_send_to_enb(enb, pkbuf, enb_ue->enb_ostream_id);
 }
@@ -115,12 +113,14 @@ int s1ap_delayed_send_to_enb_ue(
     if (duration) {
         mme_event_t *e = NULL;
 
-        e = mme_event_new(MME_EVT_S1AP_DELAYED_SEND);
+        e = mme_event_new(MME_EVT_S1AP_TIMER);
         ogs_assert(e);
-        e->timer = ogs_timer_add(mme_self()->timer_mgr, mme_event_timeout, e);
+        e->timer = ogs_timer_add(
+                mme_self()->timer_mgr, mme_timer_s1_delayed_send, e);
         ogs_assert(e->timer);
         e->pkbuf = pkbuf;
         e->enb_ue = enb_ue;
+        e->enb = enb_ue->enb;
 
         ogs_timer_start(e->timer, duration);
 
@@ -280,22 +280,47 @@ int s1ap_send_ue_context_release_command(
     int rv;
     ogs_pkbuf_t *s1apbuf = NULL;
 
-    ogs_assert(action != S1AP_UE_CTX_REL_INVALID_ACTION);
-
     ogs_assert(enb_ue);
-    enb_ue->ue_ctx_rel_action = action;
 
     ogs_debug("[MME] UE Context release command");
     ogs_debug("    ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
             enb_ue->enb_ue_s1ap_id, enb_ue->mme_ue_s1ap_id);
-    ogs_debug("    Group[%d] Cause[%d] Action[%d] Delay[%d]",
-            group, (int)cause, action, delay);
 
-    rv = s1ap_build_ue_context_release_command(&s1apbuf, enb_ue, group, cause);
-    ogs_assert(rv == OGS_OK && s1apbuf);
+    if (delay) {
+        ogs_assert(action != S1AP_UE_CTX_REL_INVALID_ACTION);
+        enb_ue->ue_ctx_rel_action = action;
 
-    rv = s1ap_delayed_send_to_enb_ue(enb_ue, s1apbuf, delay);
-    ogs_assert(rv == OGS_OK);
+        ogs_debug("    Group[%d] Cause[%d] Action[%d] Delay[%d]",
+                group, (int)cause, action, delay);
+
+        rv = s1ap_build_ue_context_release_command(
+                &s1apbuf, enb_ue, group, cause);
+        ogs_assert(rv == OGS_OK && s1apbuf);
+
+        rv = s1ap_delayed_send_to_enb_ue(enb_ue, s1apbuf, delay);
+        ogs_assert(rv == OGS_OK);
+    } else {
+        if (enb_ue->t_ue_context_release.pkbuf) {
+            s1apbuf = enb_ue->t_ue_context_release.pkbuf;
+        } else {
+            ogs_assert(action != S1AP_UE_CTX_REL_INVALID_ACTION);
+            enb_ue->ue_ctx_rel_action = action;
+
+            ogs_debug("    Group[%d] Cause[%d] Action[%d] Delay[%d]",
+                    group, (int)cause, action, delay);
+
+            rv = s1ap_build_ue_context_release_command(
+                    &s1apbuf, enb_ue, group, cause);
+            ogs_assert(rv == OGS_OK && s1apbuf);
+        }
+
+        enb_ue->t_ue_context_release.pkbuf = ogs_pkbuf_copy(s1apbuf);
+        ogs_timer_start(enb_ue->t_ue_context_release.timer, 
+                mme_timer_cfg(MME_TIMER_UE_CONTEXT_RELEASE)->duration);
+
+        rv = s1ap_delayed_send_to_enb_ue(enb_ue, s1apbuf, 0);
+        ogs_assert(rv == OGS_OK);
+    }
 
     return OGS_OK;
 }
@@ -314,14 +339,14 @@ void s1ap_send_paging(mme_ue_t *mme_ue, S1AP_CNDomain_t cn_domain)
             if (memcmp(&enb->supported_ta_list[i], &mme_ue->tai,
                         sizeof(tai_t)) == 0) {
 
-                if (mme_ue->last_paging_msg) {
-                    s1apbuf = mme_ue->last_paging_msg;
+                if (mme_ue->t3413.pkbuf) {
+                    s1apbuf = mme_ue->t3413.pkbuf;
                 } else {
                     rv = s1ap_build_paging(&s1apbuf, mme_ue, cn_domain);
                     ogs_assert(rv == OGS_OK && s1apbuf);
                 }
 
-                mme_ue->last_paging_msg = ogs_pkbuf_copy(s1apbuf);
+                mme_ue->t3413.pkbuf = ogs_pkbuf_copy(s1apbuf);
 
                 rv = s1ap_send_to_enb(enb, s1apbuf, S1AP_NON_UE_SIGNALLING);
                 ogs_assert(rv == OGS_OK);
@@ -330,28 +355,8 @@ void s1ap_send_paging(mme_ue_t *mme_ue, S1AP_CNDomain_t cn_domain)
     }
 
     /* Start T3413 */
-    ogs_timer_start(mme_ue->t3413, mme_self()->t3413_value);
-}
-
-void s1ap_t3413_timeout(void *data)
-{
-    mme_ue_t *mme_ue = data;
-    ogs_assert(mme_ue);
-
-    if (mme_ue->max_paging_retry >= MAX_NUM_OF_PAGING) {
-        /* Paging failed */
-        ogs_warn("[EMM] Paging to IMSI[%s] failed. Stop paging",
-                mme_ue->imsi_bcd);
-        if (mme_ue->last_paging_msg) {
-            ogs_pkbuf_free(mme_ue->last_paging_msg);
-            mme_ue->last_paging_msg = NULL;
-        }
-    } else {
-        mme_ue->max_paging_retry++;
-        /* If t3413 is timeout, last_paging_msg is used.
-         * We don't have to set CNDomain. So, we just set CNDomain to 0 */
-        s1ap_send_paging(mme_ue, 0);
-    }
+    ogs_timer_start(mme_ue->t3413.timer, 
+            mme_timer_cfg(MME_TIMER_T3413)->duration);
 }
 
 int s1ap_send_mme_configuration_transfer(

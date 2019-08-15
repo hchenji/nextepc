@@ -113,13 +113,13 @@ int emm_build_attach_accept(
     eps_network_feature_support->ims_vops = 1;
 
     if (MME_P_TMSI_IS_AVAILABLE(mme_ue)) {
-        ogs_assert(mme_ue->vlr);
+        ogs_assert(mme_ue->csmap);
         ogs_assert(mme_ue->p_tmsi);
 
         attach_accept->presencemask |=
             NAS_ATTACH_ACCEPT_LOCATION_AREA_IDENTIFICATION_PRESENT;
-        lai->nas_plmn_id = mme_ue->vlr->lai.nas_plmn_id;
-        lai->lac = mme_ue->vlr->lai.lac;
+        lai->nas_plmn_id = mme_ue->csmap->lai.nas_plmn_id;
+        lai->lac = mme_ue->csmap->lai.lac;
         ogs_debug("    LAI[PLMN_ID:%06x,LAC:%d]",
                 plmn_id_hexdump(&lai->nas_plmn_id), lai->lac);
 
@@ -184,7 +184,6 @@ int emm_build_identity_request(
     message.emm.h.message_type = NAS_IDENTITY_REQUEST;
 
     /* Request IMSI */
-    ogs_debug("[EMM] Identity request");
     ogs_debug("    Identity Type 2 : IMSI");
     identity_request->identity_type.type = NAS_IDENTITY_TYPE_2_IMSI;
 
@@ -241,7 +240,6 @@ int emm_build_security_mode_command(
         ogs_pkbuf_t **emmbuf, mme_ue_t *mme_ue)
 {
     int rv;
-    int i;
 
     nas_message_t message;
     nas_security_mode_command_t *security_mode_command = 
@@ -255,9 +253,6 @@ int emm_build_security_mode_command(
 
     ogs_assert(mme_ue);
 
-    ogs_debug("[EMM] Security mode command");
-    ogs_debug("    IMSI[%s]", mme_ue->imsi_bcd);
-
     memset(&message, 0, sizeof(message));
     message.h.security_header_type = 
        NAS_SECURITY_HEADER_INTEGRITY_PROTECTED_AND_NEW_SECURITY_CONTEXT;
@@ -266,20 +261,8 @@ int emm_build_security_mode_command(
     message.emm.h.protocol_discriminator = NAS_PROTOCOL_DISCRIMINATOR_EMM;
     message.emm.h.message_type = NAS_SECURITY_MODE_COMMAND;
 
-    for (i = 0; i < mme_self()->num_of_integrity_order; i++) {
-        if (mme_ue->ue_network_capability.eia & 
-                (0x80 >> mme_self()->integrity_order[i])) {
-            mme_ue->selected_int_algorithm = mme_self()->integrity_order[i];
-            break;
-        }
-    }
-    for (i = 0; i < mme_self()->num_of_ciphering_order; i++) {
-        if (mme_ue->ue_network_capability.eea & 
-                (0x80 >> mme_self()->ciphering_order[i])) {
-            mme_ue->selected_enc_algorithm = mme_self()->ciphering_order[i];
-            break;
-        }
-    }
+    mme_ue->selected_int_algorithm = mme_selected_int_algorithm(mme_ue);
+    mme_ue->selected_enc_algorithm = mme_selected_enc_algorithm(mme_ue);
 
     selected_nas_security_algorithms->type_of_integrity_protection_algorithm =
         mme_ue->selected_int_algorithm;
@@ -543,3 +526,30 @@ int emm_build_cs_service_notification(ogs_pkbuf_t **emmbuf, mme_ue_t *mme_ue)
     return OGS_OK;
 }
 
+int emm_build_downlink_nas_transport(ogs_pkbuf_t **emmbuf, mme_ue_t *mme_ue,
+        uint8_t *buffer, uint8_t length)
+{
+    nas_message_t message;
+    nas_downlink_nas_transport_t *downlink_nas_transport = 
+        &message.emm.downlink_nas_transport;
+    nas_message_container_t *nas_message_container =
+        &downlink_nas_transport->nas_message_container;
+
+    ogs_assert(mme_ue);
+
+    memset(&message, 0, sizeof(message));
+    message.h.security_header_type = 
+        NAS_SECURITY_HEADER_INTEGRITY_PROTECTED_AND_CIPHERED;
+    message.h.protocol_discriminator = NAS_PROTOCOL_DISCRIMINATOR_EMM;
+
+    message.emm.h.protocol_discriminator = NAS_PROTOCOL_DISCRIMINATOR_EMM;
+    message.emm.h.message_type = NAS_DOWNLINK_NAS_TRANSPORT;
+
+    nas_message_container->length = length;
+    memcpy(nas_message_container->buffer, buffer, length);
+
+    ogs_assert(nas_security_encode(emmbuf, mme_ue, &message) == OGS_OK && 
+            *emmbuf);
+
+    return OGS_OK;
+}

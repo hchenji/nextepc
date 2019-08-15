@@ -110,13 +110,15 @@ void mme_s11_handle_create_session_response(
     ogs_assert(rv == OGS_OK);
 
     if (OGS_FSM_CHECK(&mme_ue->sm, emm_state_initial_context_setup)) {
-        mme_vlr_t *vlr = mme_vlr_find_by_tai(&mme_ue->tai);
-        mme_ue->vlr = vlr;
+        mme_csmap_t *csmap = mme_csmap_find_by_tai(&mme_ue->tai);
+        mme_ue->csmap = csmap;
 
-        if (vlr)
+        if (csmap) {
             sgsap_send_location_update_request(mme_ue);
-        else
+        } else {
+            CLEAR_MME_UE_TIMER(mme_ue->t3450);
             nas_send_attach_accept(mme_ue);
+        }
 
     } else if (OGS_FSM_CHECK(&mme_ue->sm, emm_state_registered)) {
         nas_send_activate_default_bearer_context_request(bearer);
@@ -152,6 +154,7 @@ void mme_s11_handle_modify_bearer_response(
         source_ue = target_ue->source_ue;
         ogs_assert(source_ue);
 
+        CLEAR_ENB_UE_TIMER(source_ue->t_ue_context_release);
         rv = s1ap_send_ue_context_release_command(source_ue,
                 S1AP_Cause_PR_radioNetwork,
                 S1AP_CauseRadioNetwork_successful_handover,
@@ -225,6 +228,7 @@ void mme_s11_handle_delete_session_response(
 
                 enb_ue = mme_ue->enb_ue;
                 if (enb_ue) {
+                    CLEAR_ENB_UE_TIMER(enb_ue->t_ue_context_release);
                     rv = s1ap_send_ue_context_release_command(enb_ue,
                         S1AP_Cause_PR_nas, S1AP_CauseNas_normal_release,
                         S1AP_UE_CTX_REL_UE_CONTEXT_REMOVE, 0);
@@ -242,6 +246,7 @@ void mme_s11_handle_delete_session_response(
 
             enb_ue = mme_ue->enb_ue;
             if (enb_ue) {
+                CLEAR_ENB_UE_TIMER(enb_ue->t_ue_context_release);
                 rv = s1ap_send_ue_context_release_command(enb_ue,
                     S1AP_Cause_PR_nas, S1AP_CauseNas_normal_release,
                     S1AP_UE_CTX_REL_UE_CONTEXT_REMOVE, 0);
@@ -507,6 +512,7 @@ void mme_s11_handle_release_access_bearers_response(
     ogs_assert(rv == OGS_OK);
 
     if (enb_ue) {
+        CLEAR_ENB_UE_TIMER(enb_ue->t_ue_context_release);
         rv = s1ap_send_ue_context_release_command(enb_ue,
                 S1AP_Cause_PR_nas, S1AP_CauseNas_normal_release,
                 S1AP_UE_CTX_REL_S1_NORMAL_RELEASE, 0);

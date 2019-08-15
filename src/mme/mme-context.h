@@ -17,8 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MME_CONTEXT
-#define MME_CONTEXT
+#ifndef MME_CONTEXT_H
+#define MME_CONTEXT_H
 
 #include "ogs-crypt.h"
 #include "base/types.h"
@@ -55,6 +55,7 @@ extern int __esm_log_domain;
 typedef struct mme_sgw_s mme_sgw_t;
 typedef struct mme_pgw_s mme_pgw_t;
 typedef struct mme_vlr_s mme_vlr_t;
+typedef struct mme_csmap_s mme_csmap_t;
 
 typedef struct enb_ue_s enb_ue_t;
 typedef struct mme_ue_s mme_ue_t;
@@ -110,7 +111,7 @@ typedef struct mme_context_s {
     ogs_list_t      enb_list;       /* ENB S1AP Client List */
 
     ogs_list_t      vlr_list;       /* VLR SGsAP Client List */
-    mme_vlr_t       *vlr;           /* Iterator for VLR */
+    ogs_list_t      csmap_list;     /* TAI-LAI Map List */
 
     /* Served GUMME */
     uint8_t         max_num_of_served_gummei;
@@ -140,11 +141,6 @@ typedef struct mme_context_s {
 
     /* S1SetupResponse */
     uint8_t         relative_capacity;
-
-    /* Paging retry timer value */
-    ogs_time_t      t3413_value;
-    /* Client timer value to connect to server */
-    ogs_time_t      t_conn_value;    
 
     /* Generator for unique identification */
     uint32_t        mme_ue_s1ap_id;         /* mme_ue_s1ap_id generator */
@@ -191,8 +187,8 @@ typedef struct mme_pgw_s {
 } mme_pgw_t;
 
 #define MME_SGSAP_IS_CONNECTED(__mME) \
-    ((__mME) && ((__mME)->vlr) && \
-     (OGS_FSM_CHECK(&(__mME)->vlr->sm, sgsap_state_connected)))
+    ((__mME) && ((__mME)->csmap) && ((__mME)->csmap->vlr) && \
+     (OGS_FSM_CHECK(&(__mME)->csmap->vlr->sm, sgsap_state_connected)))
 #define MME_P_TMSI_IS_AVAILABLE(__mME) \
     (MME_SGSAP_IS_CONNECTED(__mME) && (__mME)->p_tmsi)
 
@@ -203,9 +199,6 @@ typedef struct mme_vlr_s {
 
     ogs_timer_t     *t_conn;     /* client timer to connect to server */
 
-    nas_tai_t       tai;
-    nas_lai_t       lai;
-
     uint16_t        max_num_of_ostreams;/* SCTP Max num of outbound streams */
     uint16_t        ostream_id;     /* vlr_ostream_id generator */
 
@@ -214,6 +207,15 @@ typedef struct mme_vlr_s {
     ogs_socknode_t  *node;      /* VLR SGsAP Node */
     ogs_sockaddr_t  *addr;      /* VLR SGsAP Connected Socket Address */
 } mme_vlr_t;
+
+typedef struct mme_csmap_s {
+    ogs_lnode_t     lnode;
+
+    nas_tai_t       tai;
+    nas_lai_t       lai;
+
+    mme_vlr_t       *vlr;
+} mme_csmap_t;
 
 typedef struct mme_enb_s {
     ogs_lnode_t     lnode;
@@ -269,6 +271,26 @@ struct enb_ue_s {
 #define S1AP_UE_CTX_REL_UE_CONTEXT_REMOVE                   3
 #define S1AP_UE_CTX_REL_DELETE_INDIRECT_TUNNEL              4
     uint8_t         ue_ctx_rel_action;
+
+#define CLEAR_ENB_UE_ALL_TIMERS(__eNB) \
+    do { \
+        CLEAR_ENB_UE_TIMER((__eNB)->t_ue_context_release); \
+    } while(0);
+#define CLEAR_ENB_UE_TIMER(__eNB_UE_TIMER) \
+    do { \
+        ogs_timer_stop((__eNB_UE_TIMER).timer); \
+        if ((__eNB_UE_TIMER).pkbuf) \
+        { \
+            ogs_pkbuf_free((__eNB_UE_TIMER).pkbuf); \
+            (__eNB_UE_TIMER).pkbuf = NULL; \
+        } \
+        (__eNB_UE_TIMER).retry_count = 0; \
+    } while(0);
+    struct {
+        ogs_pkbuf_t     *pkbuf;
+        ogs_timer_t     *timer;
+        uint32_t        retry_count;;
+    } t_ue_context_release;
 
     /* Related Context */
     mme_enb_t       *enb;
@@ -398,27 +420,43 @@ struct mme_ue_s {
     /* Save PDN Connectivity Request */
     nas_esm_message_container_t pdn_connectivity_request;
 
-    /* Paging */
-#define CLEAR_PAGING_INFO(__mME) \
+#define CLEAR_MME_UE_ALL_TIMERS(__mME) \
+    do { \
+        CLEAR_MME_UE_TIMER((__mME)->t3413); \
+        CLEAR_MME_UE_TIMER((__mME)->t3422); \
+        CLEAR_MME_UE_TIMER((__mME)->t3450); \
+        CLEAR_MME_UE_TIMER((__mME)->t3460); \
+        CLEAR_MME_UE_TIMER((__mME)->t3470); \
+    } while(0);
+#define CLEAR_MME_UE_TIMER(__mME_UE_TIMER) \
+    do { \
+        ogs_timer_stop((__mME_UE_TIMER).timer); \
+        if ((__mME_UE_TIMER).pkbuf) \
+        { \
+            ogs_pkbuf_free((__mME_UE_TIMER).pkbuf); \
+            (__mME_UE_TIMER).pkbuf = NULL; \
+        } \
+        (__mME_UE_TIMER).retry_count = 0; \
+    } while(0);
+    struct {
+        ogs_pkbuf_t     *pkbuf;
+        ogs_timer_t     *timer;
+        uint32_t        retry_count;;
+    } t3413, t3422, t3450, t3460, t3470;
+
+#define CLEAR_SERVICE_INDICATOR(__mME) \
     do { \
         ogs_assert((__mME)); \
-        \
-        ogs_timer_stop((__mME)->t3413); \
-        if ((__mME)->last_paging_msg) \
-        { \
-            ogs_pkbuf_free((__mME)->last_paging_msg); \
-            (__mME)->last_paging_msg = NULL; \
-        } \
-        (__mME)->max_paging_retry = 0; \
+        (__mME)->service_indicator = 0; \
     } while(0);
-    ogs_pkbuf_t     *last_paging_msg;
-    ogs_timer_t     *t3413;
-#define MAX_NUM_OF_PAGING           2
-    uint32_t        max_paging_retry;
 
-#define SGSAP_CS_CALL_SERVICE_INDICATOR     1
-#define SGSAP_SMS_SERVICE_INDICATOR         2
-    uint8_t          service_indicator;
+#define CS_CALL_SERVICE_INDICATOR(__mME) \
+    (MME_P_TMSI_IS_AVAILABLE(__mME) && \
+     ((__mME)->service_indicator) == SGSAP_CS_CALL_SERVICE_INDICATOR)
+#define SMS_SERVICE_INDICATOR(__mME) \
+    (MME_P_TMSI_IS_AVAILABLE(__mME) && \
+     ((__mME)->service_indicator) == SGSAP_SMS_SERVICE_INDICATOR)
+    uint8_t         service_indicator;
 
     /* UE Radio Capability */
     OCTET_STRING_t  ueRadioCapability;
@@ -465,7 +503,7 @@ struct mme_ue_s {
     int             session_context_will_deleted;
 
     gtp_node_t      *gnode;
-    mme_vlr_t       *vlr;
+    mme_csmap_t     *csmap;
 };
 
 #define MME_HAVE_SGW_S1U_PATH(__sESS) \
@@ -576,6 +614,26 @@ typedef struct mme_bearer_s {
     qos_t           qos;
     tlv_octet_t     tft;   /* Saved TFT */
 
+#define CLEAR_BEARER_ALL_TIMERS(__bEARER) \
+    do { \
+        CLEAR_BEARER_TIMER((__bEARER)->t3489); \
+    } while(0);
+#define CLEAR_BEARER_TIMER(__bEARER_TIMER) \
+    do { \
+        ogs_timer_stop((__bEARER_TIMER).timer); \
+        if ((__bEARER_TIMER).pkbuf) \
+        { \
+            ogs_pkbuf_free((__bEARER_TIMER).pkbuf); \
+            (__bEARER_TIMER).pkbuf = NULL; \
+        } \
+        (__bEARER_TIMER).retry_count = 0; \
+    } while(0);
+    struct {
+        ogs_pkbuf_t     *pkbuf;
+        ogs_timer_t     *timer;
+        uint32_t        retry_count;;
+    } t3489;
+
     /* Related Context */
     mme_ue_t        *mme_ue;
     mme_sess_t      *sess;
@@ -604,10 +662,14 @@ void mme_vlr_remove_all();
 
 ogs_socknode_t *mme_vlr_new_node(mme_vlr_t *vlr);
 void mme_vlr_free_node(mme_vlr_t *vlr);
-
 mme_vlr_t *mme_vlr_find_by_addr(ogs_sockaddr_t *addr);
-mme_vlr_t *mme_vlr_find_by_tai(tai_t *tai);
-mme_vlr_t *mme_vlr_find_by_nas_lai(nas_lai_t *lai);
+
+mme_csmap_t *mme_csmap_add(mme_vlr_t *vlr);
+void mme_csmap_remove(mme_csmap_t *csmap);
+void mme_csmap_remove_all(void);
+
+mme_csmap_t *mme_csmap_find_by_tai(tai_t *tai);
+mme_csmap_t *mme_csmap_find_by_nas_lai(nas_lai_t *lai);
 
 mme_enb_t *mme_enb_add(ogs_sock_t *sock, ogs_sockaddr_t *addr);
 int mme_enb_remove(mme_enb_t *enb);
@@ -732,8 +794,11 @@ int mme_m_tmsi_pool_generate();
 mme_m_tmsi_t *mme_m_tmsi_alloc();
 int mme_m_tmsi_free(mme_m_tmsi_t *tmsi);
 
+uint8_t mme_selected_int_algorithm(mme_ue_t *mme_ue);
+uint8_t mme_selected_enc_algorithm(mme_ue_t *mme_ue);
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* MME_CONTEXT */
+#endif /* MME_CONTEXT_H */

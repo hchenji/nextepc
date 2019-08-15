@@ -1,3 +1,44 @@
+nextepc (0.5.2) unstable; urgency=medium
+
+  * Bug Fixed
+
+ -- Sukchan Lee <acetcom@gmail.com>  Sun, 11 Aug 2019 11:17:35 +0000
+
+nextepc (0.5.1~xenial) xenial; urgency=medium
+
+  * SMSoSG Supported 
+  * Many BUGS Fixed
+
+ -- Sukchan Lee <acetcom@gmail.com>  Tue, 30 Jul 2019 22:42:27 +0900
+
+nextepc (0.5.1~bionic) bionic; urgency=medium
+
+  * SMSoSG Supported 
+  * Many BUGS Fixed
+
+ -- Sukchan Lee <acetcom@gmail.com>  Tue, 30 Jul 2019 22:41:14 +0900
+
+nextepc (0.5.1) unstable; urgency=medium
+
+  * SMSoSG Supported 
+  * Many BUGS Fixed
+
+ -- Sukchan Lee <acetcom@gmail.com>  Tue, 30 Jul 2019 21:34:15 +0900
+
+nextepc (0.5.0-1~bionic) bionic; urgency=medium
+
+  * CSFB Supported
+  * OGSLib package name changed
+
+ -- Sukchan Lee <acetcom@gmail.com>  Thu, 11 Jul 2019 15:34:08 +0000
+
+nextepc (0.5.0-1~xenial) xenial; urgency=medium
+
+  * CSFB Supported
+  * OGSLib package name changed
+
+ -- Sukchan Lee <acetcom@gmail.com>  Thu, 11 Jul 2019 15:09:05 +0000
+
 nextepc (0.5.0) unstable; urgency=medium
 
   * CSFB Supported

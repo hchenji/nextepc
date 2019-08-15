@@ -704,9 +704,21 @@ static void mme_s6a_ula_cb(void *data, struct msg **msg)
                 ogs_error("no_Max-Bandwidth-DL");
                 error++;
             }
+
         } else {
             ogs_error("no_AMBR");
             error++;
+        }
+
+        ret = fd_avp_search_avp(avp, s6a_subscribed_rau_tau_timer, &avpch1);
+        ogs_assert(ret == 0);
+        if (avp) {
+            ret = fd_msg_avp_hdr(avpch1, &hdr);
+            ogs_assert(ret == 0);
+            subscription_data->subscribed_rau_tau_timer = hdr->avp_value->i32;
+        } else {
+            subscription_data->subscribed_rau_tau_timer =
+                HSS_RAU_TAU_DEFAULT_TIME;
         }
 
         ret = fd_avp_search_avp(avp, s6a_apn_configuration_profile, &avpch1);
@@ -806,8 +818,8 @@ static void mme_s6a_ula_cb(void *data, struct msg **msg)
                                 pdn->qos.arp.pre_emption_capability =
                                     hdr->avp_value->i32;
                             } else {
-                                ogs_error("no_Preemption-Capability");
-                                error++;
+                                pdn->qos.arp.pre_emption_capability =
+                                    PDN_PRE_EMPTION_CAPABILITY_DISABLED;
                             }
 
                             ret = fd_avp_search_avp(avpch4,
@@ -819,8 +831,8 @@ static void mme_s6a_ula_cb(void *data, struct msg **msg)
                                 pdn->qos.arp.pre_emption_vulnerability =
                                     hdr->avp_value->i32;
                             } else {
-                                ogs_error("no_Preemption-Vulnerability");
-                                error++;
+                                pdn->qos.arp.pre_emption_vulnerability =
+                                    PDN_PRE_EMPTION_VULNERABILITY_ENABLED;
                             }
 
                         } else {
@@ -928,17 +940,6 @@ static void mme_s6a_ula_cb(void *data, struct msg **msg)
         error++;
     }
 
-    ret = fd_msg_search_avp(*msg, s6a_subscribed_rau_tau_timer, &avp);
-    ogs_assert(ret == 0);
-    if (avp) {
-        ret = fd_msg_avp_hdr(avp, &hdr);
-        ogs_assert(ret == 0);
-        subscription_data->subscribed_rau_tau_timer = hdr->avp_value->i32;
-    } else {
-        ogs_error("no_Subscribed_RAU-TAU-Timer");
-        error++;
-    }
-    
     if (!error) {
         int rv;
         e = mme_event_new(MME_EVT_S6A_MESSAGE);

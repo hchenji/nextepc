@@ -249,7 +249,7 @@ int tests1ap_build_setup_req(
     memset(&pdu, 0, sizeof (S1AP_S1AP_PDU_t));
     pdu.present = S1AP_S1AP_PDU_PR_initiatingMessage;
     pdu.choice.initiatingMessage = 
-        ogs_calloc(1, sizeof(S1AP_InitiatingMessage_t));
+        CALLOC(1, sizeof(S1AP_InitiatingMessage_t));
 
     initiatingMessage = pdu.choice.initiatingMessage;
     initiatingMessage->procedureCode = S1AP_ProcedureCode_id_S1Setup;
@@ -259,7 +259,7 @@ int tests1ap_build_setup_req(
 
     S1SetupRequest = &initiatingMessage->value.choice.S1SetupRequest;
 
-    ie = ogs_calloc(1, sizeof(S1AP_S1SetupRequestIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_S1SetupRequestIEs_t));
     ASN_SEQUENCE_ADD(&S1SetupRequest->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_Global_ENB_ID;
@@ -268,7 +268,7 @@ int tests1ap_build_setup_req(
 
     Global_ENB_ID = &ie->value.choice.Global_ENB_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_S1SetupRequestIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_S1SetupRequestIEs_t));
     ASN_SEQUENCE_ADD(&S1SetupRequest->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_SupportedTAs;
@@ -277,7 +277,7 @@ int tests1ap_build_setup_req(
 
     SupportedTAs = &ie->value.choice.SupportedTAs;
 
-    ie = ogs_calloc(1, sizeof(S1AP_S1SetupRequestIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_S1SetupRequestIEs_t));
     ASN_SEQUENCE_ADD(&S1SetupRequest->protocolIEs, ie);
     
     ie->id = S1AP_ProtocolIE_ID_id_DefaultPagingDRX;
@@ -293,10 +293,10 @@ int tests1ap_build_setup_req(
             &plmn_id, PLMN_ID_LEN, &Global_ENB_ID->pLMNidentity);
 
     SupportedTAs_Item = (S1AP_SupportedTAs_Item_t *)
-        ogs_calloc(1, sizeof(S1AP_SupportedTAs_Item_t));
+        CALLOC(1, sizeof(S1AP_SupportedTAs_Item_t));
     s1ap_uint16_to_OCTET_STRING(tac, &SupportedTAs_Item->tAC);
     PLMNidentity = (S1AP_PLMNidentity_t *)
-        ogs_calloc(1, sizeof(S1AP_PLMNidentity_t));
+        CALLOC(1, sizeof(S1AP_PLMNidentity_t));
     s1ap_buffer_to_OCTET_STRING(
             &plmn_id, PLMN_ID_LEN, PLMNidentity);
     ASN_SEQUENCE_ADD(&SupportedTAs_Item->broadcastPLMNs.list, PLMNidentity);
@@ -317,6 +317,28 @@ int tests1ap_build_setup_req(
 }
 
 #define TESTS1AP_MAX_MESSAGE 64
+
+int tests1ap_build_invalid_packet(ogs_pkbuf_t **pkbuf, int i)
+{
+    char *payload[TESTS1AP_MAX_MESSAGE] = {
+        "0011002100000300 3b40080062f22400 0001700040000700 00004062f224002c"
+        "00030a0100",
+        "",
+    };
+
+    uint16_t len[TESTS1AP_MAX_MESSAGE] = {
+        37,
+        0,
+    };
+
+    char hexbuf[MAX_SDU_LEN];
+    
+    *pkbuf = ogs_pkbuf_alloc(NULL, MAX_SDU_LEN);
+    ogs_pkbuf_put_data(*pkbuf, 
+        OGS_HEX(payload[i], strlen(payload[i]), hexbuf), len[i]);
+
+    return OGS_OK;
+}
 
 int tests1ap_build_initial_ue_msg(ogs_pkbuf_t **pkbuf, int i)
 {
@@ -406,7 +428,12 @@ int tests1ap_build_initial_ue_msg(ogs_pkbuf_t **pkbuf, int i)
         "0600000000830600 000000000d000010 005209f10700075c 08033103e5e07e90"
         "1103571882200a60 140462918100127e 00400800021f0004 0240045d0100e0c1"
         "004300060009f107 0007006440080009 f1070019b0100086 400130",
-        "",
+        "000c4080b1000005 000800048003e993 001a008086808417 6e2da9da06074102"
+        "0bf627f412000201 f700571805f070c0 4011002d026ed031 d127268080211001"
+        "0000108106000000 0083060000000000 0d00000300000a00 0005000010000011"
+        "005227f41230395c 0a003103e5e03e13 27f412c958110357 58a6200c601404ef"
+        "65233b8878d2f280 4008040260040002 1f025d0103e0c110 0203800043000600"
+        "27f4123039006440 080027f412000640 200086400130",
         "",
 
         /* 21 */
@@ -446,7 +473,7 @@ int tests1ap_build_initial_ue_msg(ogs_pkbuf_t **pkbuf, int i)
         0,
 
         155,
-        0,
+        182,
         0,
 
         /* 21 */
@@ -500,7 +527,9 @@ int tests1ap_build_identity_response(ogs_pkbuf_t **pkbuf, int i)
         /* 18 */
         "000d403b00000500 0000020001000800 020001001a001211 177b973f4c0a0756"
         "0829262400001118 93006440080009f1 070019b010004340 060009f1070007",
-        "",
+        "000d403d00000500 00000200f8000800 048003e993001a00 121117c651b5f907"
+        "0756087942120000 0000300064400800 27f4120006402000 4340060027f41230"
+        "39",
         "",
 
         /* 21 */
@@ -537,7 +566,7 @@ int tests1ap_build_identity_response(ogs_pkbuf_t **pkbuf, int i)
         0,
 
         63,
-        0,
+        65,
         0,
 
         /* 21 */
@@ -605,7 +634,9 @@ int tests1ap_build_authentication_response(ogs_pkbuf_t **pkbuf, int i)
         /* 18 */
         "000d403b00000500 0000020001000800 020001001a001211 17fda45fe50b0753"
         "086f7ff4fc4be85f d1006440080009f1 070019b010004340 060009f1070007",
-        "",
+        "000d403d00000500 00000200f8000800 048003e993001a00 121117e6e4dd6508"
+        "0753086f7ff4fc4b e85fd10064400800 27f4120006402000 4340060027f41230"
+        "39",
         "",
 
         /* 21 */
@@ -642,7 +673,7 @@ int tests1ap_build_authentication_response(ogs_pkbuf_t **pkbuf, int i)
         0,
 
         63,
-        0,
+        65,
         0,
 
         /* 21 */
@@ -762,7 +793,8 @@ int tests1ap_build_security_mode_complete(ogs_pkbuf_t **pkbuf, int i)
         /* 18 */
         "000d403200000500 0000020001000800 020001001a000908 470ba943dd00075e"
         "006440080009f107 0019b01000434006 0009f1070007",
-        "",
+        "000d403400000500 00000200f8000800 048003e993001a00 090847592cf09600"
+        "075e006440080027 f412000640200043 40060027f4123039",
         "",
 
         /* 21 */
@@ -798,7 +830,7 @@ int tests1ap_build_security_mode_complete(ogs_pkbuf_t **pkbuf, int i)
         0,
 
         54,
-        0,
+        56,
         0,
 
         /* 21 */
@@ -878,7 +910,9 @@ int tests1ap_build_esm_information_response(ogs_pkbuf_t **pkbuf, int i)
         "000d405a00000500 0000020001000800 020001001a003130 27ebeeb5d4010234"
         "da280908696e7465 726e6574271a8080 2110010100108106 0000000083060000"
         "0000000d00001000 006440080009f107 0019b01000434006 0009f1070007",
-        "",
+        "000d404000000500 00000200f8000800 048003e993001a00 151427f9e0e95c01"
+        "026eda280908696e 7465726e65740064 40080027f4120006 4020004340060027"
+        "f4123039",
         "",
     };
     uint16_t len[TESTS1AP_MAX_MESSAGE] = {
@@ -894,6 +928,7 @@ int tests1ap_build_esm_information_response(ogs_pkbuf_t **pkbuf, int i)
         0,
         0,
 
+        /* 9 */
         69,
         69,
         0,
@@ -906,8 +941,9 @@ int tests1ap_build_esm_information_response(ogs_pkbuf_t **pkbuf, int i)
         0,
         0,
 
+        /* 18 */
         94,
-        0,
+        68,
         0,
     };
     char hexbuf[MAX_SDU_LEN];
@@ -976,7 +1012,22 @@ int tests1ap_build_ue_capability_info_indication(ogs_pkbuf_t **pkbuf, int i)
         "",
 
         "",
-        "",
+        "00164081f7000003 0000000200f80008 00048003e993004a 4081e181df040ee2"
+        "03081a4cd9800818 1004e103a54ca044 8ff91ff91ff23ff2 3fe47fe47fc8ffc8"
+        "ff91ff91ff23ff23 fe47fe47fc8ffc8f f91ff7fcffebe882 002429c329d2a4b8"
+        "fc37f00000000010 254b7000000003ea 83234a801c600040 4608006300024018"
+        "c000880e10002021 0400708001010020 028410300001000c 200048039c001200"
+        "e50004807a000101 982002d010398001 000e60004807a000 101a02001d000090"
+        "0738082401ca0209 00730082401d0020 900e100024200400 50824600002001ce"
+        "020980738002603d 002090cc1001e800 048660800b4048e6 0004007a00010198"
+        "2402d01039804120 168081cc000900f4 008243404007a000 121a02002d0123a0"
+        "001000e80104c03a 000131048ff91ff9 1ff23ff23fe47fe4 7fc8ffc8ff91ff91"
+        "ff23ff23fe47fe47 fc8ffc8ff91ff91f f23ff23fe47fe47f c8ffc8ff91ff91ff"
+        "23ff23fe47fe47fc 8ffc8ff91ff91ff2 3ff23fe47fe47fc8 ffc8ff91ff91ff23"
+        "ff23fe47fe47fc8f fc8ff91ff91ff23f f23fe47fe47fc8ff c8ff91ff91ff23ff"
+        "23fe47fe47fc8ffc 8ff91ff402c00004 d043c5c10e10f1fc 391f8000648803c6"
+        "5a600923ffffcd02 1133035758a66014 04ef65233b8878d2 f2803201bb3432b2"
+        "59ef9891e7000d80 1bbe8c662479c003 60068f8b19891e70 00d80100",
         "",
 
         /* 21 */
@@ -1020,7 +1071,7 @@ int tests1ap_build_ue_capability_info_indication(ogs_pkbuf_t **pkbuf, int i)
         0,
 
         0,
-        0,
+        508,
         0,
 
         /* 21 */
@@ -1064,7 +1115,7 @@ int tests1ap_build_initial_context_setup_response(
     memset(&pdu, 0, sizeof (S1AP_S1AP_PDU_t));
     pdu.present = S1AP_S1AP_PDU_PR_successfulOutcome;
     pdu.choice.successfulOutcome = 
-        ogs_calloc(1, sizeof(S1AP_SuccessfulOutcome_t));
+        CALLOC(1, sizeof(S1AP_SuccessfulOutcome_t));
 
     successfulOutcome = pdu.choice.successfulOutcome;
     successfulOutcome->procedureCode =
@@ -1076,7 +1127,7 @@ int tests1ap_build_initial_context_setup_response(
     InitialContextSetupResponse = 
         &successfulOutcome->value.choice.InitialContextSetupResponse;
 
-    ie = ogs_calloc(1, sizeof(S1AP_InitialContextSetupResponseIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_InitialContextSetupResponseIEs_t));
     ASN_SEQUENCE_ADD(&InitialContextSetupResponse->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_MME_UE_S1AP_ID;
@@ -1086,7 +1137,7 @@ int tests1ap_build_initial_context_setup_response(
 
     MME_UE_S1AP_ID = &ie->value.choice.MME_UE_S1AP_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_InitialContextSetupResponseIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_InitialContextSetupResponseIEs_t));
     ASN_SEQUENCE_ADD(&InitialContextSetupResponse->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_eNB_UE_S1AP_ID;
@@ -1096,7 +1147,7 @@ int tests1ap_build_initial_context_setup_response(
 
     ENB_UE_S1AP_ID = &ie->value.choice.ENB_UE_S1AP_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_InitialContextSetupResponseIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_InitialContextSetupResponseIEs_t));
     ASN_SEQUENCE_ADD(&InitialContextSetupResponse->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_E_RABSetupListCtxtSURes;
@@ -1109,7 +1160,7 @@ int tests1ap_build_initial_context_setup_response(
     *MME_UE_S1AP_ID = mme_ue_s1ap_id;
     *ENB_UE_S1AP_ID = enb_ue_s1ap_id;
 
-    item = ogs_calloc(1, sizeof(S1AP_E_RABSetupItemCtxtSUResIEs_t));
+    item = CALLOC(1, sizeof(S1AP_E_RABSetupItemCtxtSUResIEs_t));
     ASN_SEQUENCE_ADD(&E_RABSetupListCtxtSURes->list, item);
 
     item->id = S1AP_ProtocolIE_ID_id_E_RABSetupItemCtxtSURes;
@@ -1163,7 +1214,7 @@ int tests1ap_build_ue_context_modification_response(
     memset(&pdu, 0, sizeof (S1AP_S1AP_PDU_t));
     pdu.present = S1AP_S1AP_PDU_PR_successfulOutcome;
     pdu.choice.successfulOutcome = 
-        ogs_calloc(1, sizeof(S1AP_SuccessfulOutcome_t));
+        CALLOC(1, sizeof(S1AP_SuccessfulOutcome_t));
 
     successfulOutcome = pdu.choice.successfulOutcome;
     successfulOutcome->procedureCode =
@@ -1175,7 +1226,7 @@ int tests1ap_build_ue_context_modification_response(
     UEContextModificationResponse = 
         &successfulOutcome->value.choice.UEContextModificationResponse;
 
-    ie = ogs_calloc(1, sizeof(S1AP_UEContextModificationResponseIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_UEContextModificationResponseIEs_t));
     ASN_SEQUENCE_ADD(&UEContextModificationResponse->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_MME_UE_S1AP_ID;
@@ -1185,7 +1236,7 @@ int tests1ap_build_ue_context_modification_response(
 
     MME_UE_S1AP_ID = &ie->value.choice.MME_UE_S1AP_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_UEContextModificationResponseIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_UEContextModificationResponseIEs_t));
     ASN_SEQUENCE_ADD(&UEContextModificationResponse->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_eNB_UE_S1AP_ID;
@@ -1345,7 +1396,8 @@ int tests1ap_build_attach_complete(ogs_pkbuf_t **pkbuf, int i)
         /* 18 */
         "000d403700000500 0000020001000800 020001001a000e0d 27ffe827a8020743"
         "00035200c2006440 080009f1070019b0 10004340060009f1 070007",
-        "",
+        "000d403900000500 00000200f8000800 048003e993001a00 0e0d27b1f1539802"
+        "074300035200c200 6440080027f41200 0640200043400600 27f4123039",
         "",
 
         /* 21 */
@@ -1380,7 +1432,7 @@ int tests1ap_build_attach_complete(ogs_pkbuf_t **pkbuf, int i)
         0,
 
         59,
-        0,
+        61,
         0,
 
         /* 21 */
@@ -1554,7 +1606,7 @@ int tests1ap_build_ue_context_release_request(ogs_pkbuf_t **pkbuf, int i)
         /* 18 */
         "0012401500000300 0000020001000800 0200010002400202 80",
         "0012401500000300 0000020002000800 0200020002400202 e0",
-        "",
+        "0012401700000300 00000200f8000800 048003e993000240 0202e0",
     };
     uint16_t len[TESTS1AP_MAX_MESSAGE] = {
         28,
@@ -1583,7 +1635,7 @@ int tests1ap_build_ue_context_release_request(ogs_pkbuf_t **pkbuf, int i)
 
         25,
         25,
-        0,
+        27,
     };
     char hexbuf[MAX_SDU_LEN];
     
@@ -1636,7 +1688,7 @@ int tests1ap_build_ue_context_release_complete(ogs_pkbuf_t **pkbuf, int i)
         /* 18 */
         "2017000f00000200 0040020001000840 020001",
         "2017000f00000200 0040020002000840 020002",
-        "",
+        "2017001100000200 00400200f8000840 048003e993",
 
         /* 21 */
         "2017000f00000200 00400200d0000840 0200d0",
@@ -1669,7 +1721,7 @@ int tests1ap_build_ue_context_release_complete(ogs_pkbuf_t **pkbuf, int i)
 
         19,
         19,
-        0,
+        21,
         
         /* 21 */
         19,
@@ -1742,10 +1794,18 @@ int tests1ap_build_tau_request(ogs_pkbuf_t **pkbuf, int i,
         "00f1103039",
         "",
 
+        /* Crash : 3 */
+
+        "",
+
     };
     uint16_t len[TESTS1AP_MAX_MESSAGE] = {
         113,
         103,
+        0,
+
+        77,
+        68,
         0,
     };
     char hexbuf[MAX_SDU_LEN];
@@ -1828,10 +1888,16 @@ int tests1ap_build_extended_service_request(ogs_pkbuf_t **pkbuf, int i,
 
         "000d403900000500 0000020001000800 020001001a00100f 17b51a57a504074c"
         "000504e900a25200 6440080009f10700 19b0100043400600 09f1070007",
+
         "",
 
         /* 21 */
-        "",
+        "000c404900000600 0800048004141300 1a001514172cf294 2e04074c0105f4e6"
+        "004551b157022000 004300060027f412 3039006440080027 f412000640300086"
+        "4001200060000600 40e6004551",
+        "000d404000000500 00000200f8000800 048003e993001a00 151427b426655c03"
+        "074c0105f4e60045 51b1570220000064 40080027f4120006 4020004340060027"
+        "f4123039",
         "",
     };
     uint16_t len[TESTS1AP_MAX_MESSAGE] = {
@@ -1864,8 +1930,8 @@ int tests1ap_build_extended_service_request(ogs_pkbuf_t **pkbuf, int i,
         0,
         
         /* 21 */
-        0,
-        0,
+        77,
+        68,
         0,
     };
     char hexbuf[MAX_SDU_LEN];
@@ -1888,6 +1954,20 @@ int tests1ap_build_extended_service_request(ogs_pkbuf_t **pkbuf, int i,
         snow_3g_f9(knas_int, seq, (0 << 27), 0,
                 (*pkbuf)->data + 29, (10 << 3),
                 (*pkbuf)->data + 25);
+    } else if (i == 21) {
+        memcpy((*pkbuf)->data + 28, &service_type, sizeof service_type);
+        m_tmsi = htonl(m_tmsi);
+        memcpy((*pkbuf)->data + 31, &m_tmsi, sizeof m_tmsi);
+        snow_3g_f9(knas_int, seq, (0 << 27), 0,
+                (*pkbuf)->data + 25, (15 << 3),
+                (*pkbuf)->data + 21);
+    } else if (i == 22) {
+        memcpy((*pkbuf)->data + 34, &service_type, sizeof service_type);
+        m_tmsi = htonl(m_tmsi);
+        memcpy((*pkbuf)->data + 37, &m_tmsi, sizeof m_tmsi);
+        snow_3g_f9(knas_int, seq, (0 << 27), 0,
+                (*pkbuf)->data + 31, (15 << 3),
+                (*pkbuf)->data + 27);
     }
 
     return OGS_OK;
@@ -2010,7 +2090,7 @@ int tests1ap_build_e_rab_setup_response(
     memset(&pdu, 0, sizeof (S1AP_S1AP_PDU_t));
     pdu.present = S1AP_S1AP_PDU_PR_successfulOutcome;
     pdu.choice.successfulOutcome = 
-        ogs_calloc(1, sizeof(S1AP_SuccessfulOutcome_t));
+        CALLOC(1, sizeof(S1AP_SuccessfulOutcome_t));
 
     successfulOutcome = pdu.choice.successfulOutcome;
     successfulOutcome->procedureCode = S1AP_ProcedureCode_id_E_RABSetup;
@@ -2020,7 +2100,7 @@ int tests1ap_build_e_rab_setup_response(
 
     E_RABSetupResponse = &successfulOutcome->value.choice.E_RABSetupResponse;
 
-    ie = ogs_calloc(1, sizeof(S1AP_E_RABSetupResponseIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_E_RABSetupResponseIEs_t));
     ASN_SEQUENCE_ADD(&E_RABSetupResponse->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_MME_UE_S1AP_ID;
@@ -2029,7 +2109,7 @@ int tests1ap_build_e_rab_setup_response(
 
     MME_UE_S1AP_ID = &ie->value.choice.MME_UE_S1AP_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_E_RABSetupResponseIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_E_RABSetupResponseIEs_t));
     ASN_SEQUENCE_ADD(&E_RABSetupResponse->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_eNB_UE_S1AP_ID;
@@ -2038,7 +2118,7 @@ int tests1ap_build_e_rab_setup_response(
 
     ENB_UE_S1AP_ID = &ie->value.choice.ENB_UE_S1AP_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_E_RABSetupResponseIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_E_RABSetupResponseIEs_t));
     ASN_SEQUENCE_ADD(&E_RABSetupResponse->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_E_RABSetupListBearerSURes;
@@ -2051,7 +2131,7 @@ int tests1ap_build_e_rab_setup_response(
     *MME_UE_S1AP_ID = mme_ue_s1ap_id;
     *ENB_UE_S1AP_ID = enb_ue_s1ap_id;
 
-    item = ogs_calloc(1, sizeof(S1AP_E_RABSetupItemBearerSUResIEs_t));
+    item = CALLOC(1, sizeof(S1AP_E_RABSetupItemBearerSUResIEs_t));
     ASN_SEQUENCE_ADD(&E_RABSetupListBearerSURes->list, item);
 
     item->id = S1AP_ProtocolIE_ID_id_E_RABSetupItemBearerSURes;
@@ -2378,7 +2458,7 @@ int tests1ap_build_path_switch_request(
     memset(&pdu, 0, sizeof (S1AP_S1AP_PDU_t));
     pdu.present = S1AP_S1AP_PDU_PR_initiatingMessage;
     pdu.choice.initiatingMessage = 
-        ogs_calloc(1, sizeof(S1AP_InitiatingMessage_t));
+        CALLOC(1, sizeof(S1AP_InitiatingMessage_t));
 
     initiatingMessage = pdu.choice.initiatingMessage;
     initiatingMessage->procedureCode = S1AP_ProcedureCode_id_PathSwitchRequest;
@@ -2388,7 +2468,7 @@ int tests1ap_build_path_switch_request(
 
     PathSwitchRequest = &initiatingMessage->value.choice.PathSwitchRequest;
 
-    ie = ogs_calloc(1, sizeof(S1AP_PathSwitchRequestIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_PathSwitchRequestIEs_t));
     ASN_SEQUENCE_ADD(&PathSwitchRequest->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_eNB_UE_S1AP_ID;
@@ -2397,7 +2477,7 @@ int tests1ap_build_path_switch_request(
 
     ENB_UE_S1AP_ID = &ie->value.choice.ENB_UE_S1AP_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_PathSwitchRequestIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_PathSwitchRequestIEs_t));
     ASN_SEQUENCE_ADD(&PathSwitchRequest->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_E_RABToBeSwitchedDLList;
@@ -2407,7 +2487,7 @@ int tests1ap_build_path_switch_request(
 
     E_RABToBeSwitchedDLList = &ie->value.choice.E_RABToBeSwitchedDLList;
 
-    ie = ogs_calloc(1, sizeof(S1AP_PathSwitchRequestIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_PathSwitchRequestIEs_t));
     ASN_SEQUENCE_ADD(&PathSwitchRequest->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_SourceMME_UE_S1AP_ID;
@@ -2416,7 +2496,7 @@ int tests1ap_build_path_switch_request(
 
     MME_UE_S1AP_ID = &ie->value.choice.MME_UE_S1AP_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_PathSwitchRequestIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_PathSwitchRequestIEs_t));
     ASN_SEQUENCE_ADD(&PathSwitchRequest->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_EUTRAN_CGI;
@@ -2425,7 +2505,7 @@ int tests1ap_build_path_switch_request(
 
     EUTRAN_CGI = &ie->value.choice.EUTRAN_CGI;
 
-    ie = ogs_calloc(1, sizeof(S1AP_PathSwitchRequestIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_PathSwitchRequestIEs_t));
     ASN_SEQUENCE_ADD(&PathSwitchRequest->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_TAI;
@@ -2434,7 +2514,7 @@ int tests1ap_build_path_switch_request(
 
     TAI = &ie->value.choice.TAI;
 
-    ie = ogs_calloc(1, sizeof(S1AP_PathSwitchRequestIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_PathSwitchRequestIEs_t));
     ASN_SEQUENCE_ADD(&PathSwitchRequest->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_UESecurityCapabilities;
@@ -2461,7 +2541,7 @@ int tests1ap_build_path_switch_request(
         ip_t ip;
         int len;
 
-        item = ogs_calloc(1, sizeof(S1AP_E_RABToBeSwitchedDLItemIEs_t));
+        item = CALLOC(1, sizeof(S1AP_E_RABToBeSwitchedDLItemIEs_t));
         ASN_SEQUENCE_ADD(&E_RABToBeSwitchedDLList->list, item);
 
         item->id = S1AP_ProtocolIE_ID_id_E_RABToBeSwitchedDLItem;
@@ -2496,7 +2576,7 @@ int tests1ap_build_path_switch_request(
     s1ap_buffer_to_OCTET_STRING(
             &mme_ue->e_cgi.plmn_id, PLMN_ID_LEN, &EUTRAN_CGI->pLMNidentity);
     EUTRAN_CGI->cell_ID.size = 4;
-    EUTRAN_CGI->cell_ID.buf =  ogs_calloc(
+    EUTRAN_CGI->cell_ID.buf =  CALLOC(
          EUTRAN_CGI->cell_ID.size, sizeof(uint8_t));
     ogs_assert(EUTRAN_CGI->cell_ID.buf);
     EUTRAN_CGI->cell_ID.buf[0] = (mme_ue->e_cgi.cell_id >> 24);
@@ -2512,7 +2592,7 @@ int tests1ap_build_path_switch_request(
 
     UESecurityCapabilities->encryptionAlgorithms.size = 2;
     UESecurityCapabilities->encryptionAlgorithms.buf = 
-        ogs_calloc(UESecurityCapabilities->encryptionAlgorithms.size, 
+        CALLOC(UESecurityCapabilities->encryptionAlgorithms.size, 
                     sizeof(uint8_t));
     UESecurityCapabilities->encryptionAlgorithms.bits_unused = 0;
     UESecurityCapabilities->encryptionAlgorithms.buf[0] = 
@@ -2520,7 +2600,7 @@ int tests1ap_build_path_switch_request(
 
     UESecurityCapabilities->integrityProtectionAlgorithms.size = 2;
     UESecurityCapabilities->integrityProtectionAlgorithms.buf =
-        ogs_calloc(UESecurityCapabilities->
+        CALLOC(UESecurityCapabilities->
                         integrityProtectionAlgorithms.size, sizeof(uint8_t));
     UESecurityCapabilities->integrityProtectionAlgorithms.bits_unused = 0;
     UESecurityCapabilities->integrityProtectionAlgorithms.buf[0] =
@@ -2660,7 +2740,7 @@ int tests1ap_build_handover_request_ack(
     memset(&pdu, 0, sizeof (S1AP_S1AP_PDU_t));
     pdu.present = S1AP_S1AP_PDU_PR_successfulOutcome;
     pdu.choice.successfulOutcome = 
-        ogs_calloc(1, sizeof(S1AP_SuccessfulOutcome_t));
+        CALLOC(1, sizeof(S1AP_SuccessfulOutcome_t));
 
     successfulOutcome = pdu.choice.successfulOutcome;
     successfulOutcome->procedureCode = S1AP_ProcedureCode_id_HandoverResourceAllocation;
@@ -2671,7 +2751,7 @@ int tests1ap_build_handover_request_ack(
     HandoverRequestAcknowledge =
         &successfulOutcome->value.choice.HandoverRequestAcknowledge;
 
-    ie = ogs_calloc(1, sizeof(S1AP_HandoverRequestAcknowledgeIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_HandoverRequestAcknowledgeIEs_t));
     ASN_SEQUENCE_ADD(&HandoverRequestAcknowledge->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_MME_UE_S1AP_ID;
@@ -2681,7 +2761,7 @@ int tests1ap_build_handover_request_ack(
 
     MME_UE_S1AP_ID = &ie->value.choice.MME_UE_S1AP_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_HandoverRequestAcknowledgeIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_HandoverRequestAcknowledgeIEs_t));
     ASN_SEQUENCE_ADD(&HandoverRequestAcknowledge->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_eNB_UE_S1AP_ID;
@@ -2691,7 +2771,7 @@ int tests1ap_build_handover_request_ack(
 
     ENB_UE_S1AP_ID = &ie->value.choice.ENB_UE_S1AP_ID;
 
-    ie = ogs_calloc(1, sizeof(S1AP_HandoverRequestAcknowledgeIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_HandoverRequestAcknowledgeIEs_t));
     ASN_SEQUENCE_ADD(&HandoverRequestAcknowledge->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_E_RABAdmittedList;
@@ -2701,7 +2781,7 @@ int tests1ap_build_handover_request_ack(
 
     E_RABAdmittedList = &ie->value.choice.E_RABAdmittedList;
 
-    ie = ogs_calloc(1, sizeof(S1AP_HandoverRequestAcknowledgeIEs_t));
+    ie = CALLOC(1, sizeof(S1AP_HandoverRequestAcknowledgeIEs_t));
     ASN_SEQUENCE_ADD(&HandoverRequestAcknowledge->protocolIEs, ie);
 
     ie->id = S1AP_ProtocolIE_ID_id_Target_ToSource_TransparentContainer;
@@ -2723,7 +2803,7 @@ int tests1ap_build_handover_request_ack(
         ip_t ip;
         int len;
 
-        item = ogs_calloc(1, sizeof(S1AP_E_RABAdmittedItemIEs_t));
+        item = CALLOC(1, sizeof(S1AP_E_RABAdmittedItemIEs_t));
         ASN_SEQUENCE_ADD(&E_RABAdmittedList->list, item);
 
         item->id = S1AP_ProtocolIE_ID_id_E_RABAdmittedItem;
@@ -2756,20 +2836,20 @@ int tests1ap_build_handover_request_ack(
 
         e_rab->dL_transportLayerAddress =
             (S1AP_TransportLayerAddress_t *)
-            ogs_calloc(1, sizeof(S1AP_TransportLayerAddress_t));
+            CALLOC(1, sizeof(S1AP_TransportLayerAddress_t));
         rv = s1ap_ip_to_BIT_STRING(&ip, e_rab->dL_transportLayerAddress);
         ogs_assert(rv == OGS_OK);
         e_rab->dL_gTP_TEID = (S1AP_GTP_TEID_t *)
-            ogs_calloc(1, sizeof(S1AP_GTP_TEID_t));
+            CALLOC(1, sizeof(S1AP_GTP_TEID_t));
         s1ap_uint32_to_OCTET_STRING(teid+i+10, e_rab->dL_gTP_TEID);
 
         e_rab->uL_TransportLayerAddress =
             (S1AP_TransportLayerAddress_t *)
-            ogs_calloc(1, sizeof(S1AP_TransportLayerAddress_t));
+            CALLOC(1, sizeof(S1AP_TransportLayerAddress_t));
         rv = s1ap_ip_to_BIT_STRING(&ip, e_rab->uL_TransportLayerAddress);
         ogs_assert(rv == OGS_OK);
         e_rab->uL_GTP_TEID = (S1AP_GTP_TEID_t *)
-            ogs_calloc(1, sizeof(S1AP_GTP_TEID_t));
+            CALLOC(1, sizeof(S1AP_GTP_TEID_t));
         s1ap_uint32_to_OCTET_STRING(teid+i+20, e_rab->uL_GTP_TEID);
     }
 
@@ -3058,6 +3138,49 @@ int tests1ap_build_s1_reset(ogs_pkbuf_t **pkbuf, int i)
     return OGS_OK;
 }
 
+int tests1ap_build_uplink_nas_transport(ogs_pkbuf_t **pkbuf, int i)
+{
+    char *payload[TESTS1AP_MAX_MESSAGE] = { 
+        "000d40809d000005 0000000200010008 00020001001a0074 7327f908d4bd0307"
+        "636a390167000300 0581005155f55d11 030c914477680205 490000055ad2e2b1"
+        "252d467ff6de6c47 efd568375b303613 166fb51c6d160cc2 8ab462b006a3d98a"
+        "31da90060b0673c5 9c512684158bb119 2c88b3058b37e1ad 081bca84c1582d07"
+        "93ede4bddc6d2693 e566371b00644008 0009f1070019b010 004340060009f107"
+        "0007",
+        "",
+        "",
+
+        "",
+        "",
+        "",
+
+        "",
+        "",
+        "",
+
+    };
+    uint16_t len[TESTS1AP_MAX_MESSAGE] = {
+        162,
+        0,
+        0,
+
+        0,
+        0,
+        0,
+
+        0,
+        0,
+        0,
+    };
+    char hexbuf[MAX_SDU_LEN];
+    
+    *pkbuf = ogs_pkbuf_alloc(NULL, MAX_SDU_LEN);
+    ogs_pkbuf_put_data(*pkbuf, 
+        OGS_HEX(payload[i], strlen(payload[i]), hexbuf), len[i]);
+
+    return OGS_OK;
+}
+
 uint16_t in_cksum(uint16_t *addr, int len); /* from pgw_gtp_path.c */
 
 int testgtpu_build_ping(
@@ -3175,13 +3298,13 @@ int testsgsap_location_update_accept(ogs_pkbuf_t **pkbuf, int i)
 {
     char *payload[TESTS1AP_MAX_MESSAGE] = {
         "0a01082926240000 111893040509f107 09260e05f49ee88e 64",
-        "",
+        "0a01087942120000 000030040527f412 c9580e05f437ab9c c5",
         "",
 
     };
     uint16_t len[TESTS1AP_MAX_MESSAGE] = {
         25,
-        0,
+        25,
         0,
     };
     char hexbuf[MAX_SDU_LEN];
@@ -3242,11 +3365,22 @@ int testsgsap_paging_request(ogs_pkbuf_t **pkbuf, int i)
     char *payload[TESTS1AP_MAX_MESSAGE] = {
         "0101082926240000 111893021003766c 72076578616d706c 65036e6574200101"
         "040509f1070926",
-        "",
-        "",
+        "0101082926240000 111892021003766c 72076578616d706c 65036e6574200101"
+        "040509f1070926",  /* Paging-Reject */
+        "0101082926240000 111893021003766c 72076578616d706c 65036e6574200102"
+        "040509f1070926",  /* Paging-Request with SMS */
 
+        /* Paging-Request for crash-test */
+        "0101087942120000 000030021003766c 72076578616d706c 65036e6574200101"
+        "040527f412c958",
+        "",
+        "",
     };
     uint16_t len[TESTS1AP_MAX_MESSAGE] = {
+        39,
+        39,
+        39,
+
         39,
         0,
         0,
@@ -3270,6 +3404,74 @@ int testsgsap_reset_indication(ogs_pkbuf_t **pkbuf, int i)
     };
     uint16_t len[TESTS1AP_MAX_MESSAGE] = {
         19,
+        0,
+        0,
+    };
+    char hexbuf[MAX_SDU_LEN];
+    
+    *pkbuf = ogs_pkbuf_alloc(NULL, MAX_SDU_LEN);
+    ogs_pkbuf_put_data(*pkbuf, 
+        OGS_HEX(payload[i], strlen(payload[i]), hexbuf), len[i]);
+
+    return OGS_OK;
+}
+
+int testsgsap_release_request(ogs_pkbuf_t **pkbuf, int i)
+{
+    char *payload[TESTS1AP_MAX_MESSAGE] = {
+        "1b01082926240000 111893",
+        "",
+        "",
+
+    };
+    uint16_t len[TESTS1AP_MAX_MESSAGE] = {
+        11,
+        0,
+        0,
+    };
+    char hexbuf[MAX_SDU_LEN];
+    
+    *pkbuf = ogs_pkbuf_alloc(NULL, MAX_SDU_LEN);
+    ogs_pkbuf_put_data(*pkbuf, 
+        OGS_HEX(payload[i], strlen(payload[i]), hexbuf), len[i]);
+
+    return OGS_OK;
+}
+
+int testsgsap_downlink_unitdata(ogs_pkbuf_t **pkbuf, int i)
+{
+    char *payload[TESTS1AP_MAX_MESSAGE] = {
+        "0701082926240000 1118931626090123 0100079144775810 0650001700048032"
+        "2400009160404044 150009c8329bfd06 4d9b53",
+        "",
+        "",
+
+    };
+    uint16_t len[TESTS1AP_MAX_MESSAGE] = {
+        51,
+        0,
+        0,
+    };
+    char hexbuf[MAX_SDU_LEN];
+    
+    *pkbuf = ogs_pkbuf_alloc(NULL, MAX_SDU_LEN);
+    ogs_pkbuf_put_data(*pkbuf, 
+        OGS_HEX(payload[i], strlen(payload[i]), hexbuf), len[i]);
+
+    return OGS_OK;
+}
+
+int testsgsap_mm_information_request(ogs_pkbuf_t **pkbuf, int i)
+{
+    char *payload[TESTS1AP_MAX_MESSAGE] = {
+        "1a01087942120000 0000301714430483 d46413450483d464 1347917071028401"
+        "29",
+        "",
+        "",
+
+    };
+    uint16_t len[TESTS1AP_MAX_MESSAGE] = {
+        33,
         0,
         0,
     };

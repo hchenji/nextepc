@@ -89,11 +89,6 @@ int sgsap_send_to_vlr_with_sid(
     ogs_assert(sock);
 
     ogs_debug("    VLR-IP[%s]", OGS_ADDR(node->addr, buf));
-    ogs_debug("    TAI[PLMN_ID:%06x,TAC:%d]",
-                plmn_id_hexdump(&vlr->tai.nas_plmn_id), vlr->tai.tac);
-    ogs_debug("    LAI[PLMN_ID:%06x,LAC:%d]",
-                plmn_id_hexdump(&vlr->lai.nas_plmn_id), vlr->lai.lac);
-
     rv = sgsap_send(sock, pkbuf, node->addr, stream_no);
     if (rv != OGS_OK) {
         ogs_error("sgsap_send() failed");
@@ -108,11 +103,21 @@ int sgsap_send_to_vlr_with_sid(
 
 int sgsap_send_to_vlr(mme_ue_t *mme_ue, ogs_pkbuf_t *pkbuf)
 {
+    mme_csmap_t *csmap = NULL;
     mme_vlr_t *vlr = NULL;
-    ogs_assert(mme_ue);
+
     ogs_assert(pkbuf);
-    vlr = mme_ue->vlr;
+
+    ogs_assert(mme_ue);
+    csmap = mme_ue->csmap;
+    ogs_assert(csmap);
+    vlr = csmap->vlr;
     ogs_assert(vlr);
+
+    ogs_debug("    TAI[PLMN_ID:%06x,TAC:%d]",
+                plmn_id_hexdump(&csmap->tai.nas_plmn_id), csmap->tai.tac);
+    ogs_debug("    LAI[PLMN_ID:%06x,LAC:%d]",
+                plmn_id_hexdump(&csmap->lai.nas_plmn_id), csmap->lai.lac);
 
     return sgsap_send_to_vlr_with_sid(vlr, pkbuf, mme_ue->vlr_ostream_id);
 }
@@ -206,6 +211,43 @@ int sgsap_send_reset_ack(mme_vlr_t *vlr)
 
     pkbuf = sgsap_build_reset_ack(vlr);
     rv =  sgsap_send_to_vlr_with_sid(vlr, pkbuf, 0);
+    ogs_assert(rv == OGS_OK);
+
+    return OGS_OK;
+}
+
+int sgsap_send_uplink_unitdata(
+        mme_ue_t *mme_ue, nas_message_container_t *nas_message_container)
+{
+    int rv;
+    ogs_pkbuf_t *pkbuf = NULL;
+    ogs_assert(mme_ue);
+    ogs_assert(nas_message_container);
+
+    ogs_debug("[SGSAP] UPLINK-UNITDATA");
+    ogs_debug("    IMSI[%s]", mme_ue->imsi_bcd);
+    ogs_log_hexdump(OGS_LOG_DEBUG,
+            nas_message_container->buffer, nas_message_container->length);
+
+    pkbuf = sgsap_build_uplink_unidata(mme_ue, nas_message_container);
+    rv = sgsap_send_to_vlr(mme_ue, pkbuf);
+    ogs_assert(rv == OGS_OK);
+
+    return OGS_OK;
+}
+
+int sgsap_send_ue_unreachable(mme_ue_t *mme_ue, uint8_t sgs_cause)
+{
+    int rv;
+    ogs_pkbuf_t *pkbuf = NULL;
+    ogs_assert(mme_ue);
+
+    ogs_debug("[SGSAP] UE-UNREACHABLE");
+    ogs_debug("    IMSI[%s]", mme_ue->imsi_bcd);
+    ogs_debug("    CAUSE[%d]", sgs_cause);
+
+    pkbuf = sgsap_build_ue_unreachable(mme_ue, sgs_cause);
+    rv = sgsap_send_to_vlr(mme_ue, pkbuf);
     ogs_assert(rv == OGS_OK);
 
     return OGS_OK;

@@ -23,6 +23,7 @@
 #include "emm-build.h"
 #include "nas-path.h"
 #include "mme-event.h"
+#include "mme-timer.h"
 #include "mme-sm.h"
 
 int nas_send_to_enb(mme_ue_t *mme_ue, ogs_pkbuf_t *pkbuf)
@@ -97,14 +98,23 @@ int nas_send_attach_accept(mme_ue_t *mme_ue)
     ogs_assert(bearer);
     ogs_assert(mme_bearer_next(bearer) == NULL);
 
-    rv = esm_build_activate_default_bearer_context_request(&esmbuf, sess);
-    ogs_assert(rv == OGS_OK && esmbuf);
+    if (mme_ue->t3450.pkbuf) {
+        s1apbuf = mme_ue->t3450.pkbuf;
 
-    rv = emm_build_attach_accept(&emmbuf, mme_ue, esmbuf);
-    ogs_assert(rv == OGS_OK && emmbuf);
+    } else {
+        rv = esm_build_activate_default_bearer_context_request(&esmbuf, sess);
+        ogs_assert(rv == OGS_OK && esmbuf);
 
-    rv = s1ap_build_initial_context_setup_request(&s1apbuf, mme_ue, emmbuf);
-    ogs_assert(rv == OGS_OK && s1apbuf);
+        rv = emm_build_attach_accept(&emmbuf, mme_ue, esmbuf);
+        ogs_assert(rv == OGS_OK && emmbuf);
+
+        rv = s1ap_build_initial_context_setup_request(&s1apbuf, mme_ue, emmbuf);
+        ogs_assert(rv == OGS_OK && s1apbuf);
+    }
+
+    mme_ue->t3450.pkbuf = ogs_pkbuf_copy(s1apbuf);
+    ogs_timer_start(mme_ue->t3450.timer, 
+            mme_timer_cfg(MME_TIMER_T3450)->duration);
 
     rv = nas_send_to_enb(mme_ue, s1apbuf);
     ogs_assert(rv == OGS_OK);
@@ -145,8 +155,19 @@ int nas_send_identity_request(mme_ue_t *mme_ue)
 
     ogs_assert(mme_ue);
 
-    rv = emm_build_identity_request(&emmbuf, mme_ue);
-    ogs_assert(rv == OGS_OK && emmbuf);
+    ogs_debug("[EMM] Identity request");
+
+    if (mme_ue->t3470.pkbuf) {
+        emmbuf = mme_ue->t3470.pkbuf;
+
+    } else {
+        rv = emm_build_identity_request(&emmbuf, mme_ue);
+        ogs_assert(rv == OGS_OK && emmbuf);
+    }
+
+    mme_ue->t3470.pkbuf = ogs_pkbuf_copy(emmbuf);
+    ogs_timer_start(mme_ue->t3470.timer, 
+            mme_timer_cfg(MME_TIMER_T3470)->duration);
 
     rv = nas_send_to_downlink_nas_transport(mme_ue, emmbuf);
     ogs_assert(rv == OGS_OK);
@@ -161,13 +182,50 @@ int nas_send_authentication_request(
     ogs_pkbuf_t *emmbuf = NULL;
 
     ogs_assert(mme_ue);
-    ogs_assert(e_utran_vector);
 
     ogs_debug("[EMM] Authentication request");
     ogs_debug("    IMSI[%s]", mme_ue->imsi_bcd);
 
-    rv = emm_build_authentication_request(&emmbuf, e_utran_vector);
-    ogs_assert(rv == OGS_OK && emmbuf);
+    if (mme_ue->t3460.pkbuf) {
+        emmbuf = mme_ue->t3460.pkbuf;
+
+    } else {
+        ogs_assert(e_utran_vector);
+        rv = emm_build_authentication_request(&emmbuf, e_utran_vector);
+        ogs_assert(rv == OGS_OK && emmbuf);
+    }
+
+    mme_ue->t3460.pkbuf = ogs_pkbuf_copy(emmbuf);
+    ogs_timer_start(mme_ue->t3460.timer, 
+            mme_timer_cfg(MME_TIMER_T3460)->duration);
+
+    rv = nas_send_to_downlink_nas_transport(mme_ue, emmbuf);
+    ogs_assert(rv == OGS_OK);
+
+    return rv;
+}
+
+int nas_send_security_mode_command(mme_ue_t *mme_ue)
+{
+    int rv;
+    ogs_pkbuf_t *emmbuf = NULL;
+
+    ogs_assert(mme_ue);
+
+    ogs_debug("[EMM] Security mode command");
+    ogs_debug("    IMSI[%s]", mme_ue->imsi_bcd);
+
+    if (mme_ue->t3460.pkbuf) {
+        emmbuf = mme_ue->t3460.pkbuf;
+
+    } else {
+        rv = emm_build_security_mode_command(&emmbuf, mme_ue);
+        ogs_assert(rv == OGS_OK && emmbuf);
+    }
+
+    mme_ue->t3460.pkbuf = ogs_pkbuf_copy(emmbuf);
+    ogs_timer_start(mme_ue->t3460.timer, 
+            mme_timer_cfg(MME_TIMER_T3460)->duration);
 
     rv = nas_send_to_downlink_nas_transport(mme_ue, emmbuf);
     ogs_assert(rv == OGS_OK);
@@ -213,6 +271,7 @@ int nas_send_detach_accept(mme_ue_t *mme_ue)
         ogs_assert(rv == OGS_OK);
     }
 
+    CLEAR_ENB_UE_TIMER(enb_ue->t_ue_context_release);
     rv = s1ap_send_ue_context_release_command(enb_ue,
             S1AP_Cause_PR_nas, S1AP_CauseNas_detach,
             S1AP_UE_CTX_REL_S1_NORMAL_RELEASE, 0);
@@ -260,8 +319,16 @@ int nas_send_esm_information_request(mme_bearer_t *bearer)
     mme_ue = bearer->mme_ue;
     ogs_assert(mme_ue);
 
-    rv = esm_build_information_request(&esmbuf, bearer);
-    ogs_assert(rv == OGS_OK && esmbuf);
+    if (bearer->t3489.pkbuf) {
+        esmbuf = bearer->t3489.pkbuf;
+    } else {
+        rv = esm_build_information_request(&esmbuf, bearer);
+        ogs_assert(rv == OGS_OK && esmbuf);
+    }
+
+    bearer->t3489.pkbuf = ogs_pkbuf_copy(esmbuf);
+    ogs_timer_start(bearer->t3489.timer, 
+            mme_timer_cfg(MME_TIMER_T3489)->duration);
 
     rv = nas_send_to_downlink_nas_transport(mme_ue, esmbuf);
     ogs_assert(rv == OGS_OK);
@@ -467,6 +534,28 @@ int nas_send_cs_service_notification(mme_ue_t *mme_ue)
     ogs_debug("    IMSI[%s]", mme_ue->imsi_bcd);
 
     rv = emm_build_cs_service_notification(&emmbuf, mme_ue);
+    ogs_assert(rv == OGS_OK && emmbuf);
+
+    rv = nas_send_to_downlink_nas_transport(mme_ue, emmbuf);
+    ogs_assert(rv == OGS_OK);
+
+    return OGS_OK;
+}
+
+int nas_send_downlink_nas_transport(
+        mme_ue_t *mme_ue, uint8_t *buffer, uint8_t length)
+{
+    int rv;
+    ogs_pkbuf_t *emmbuf = NULL;
+
+    ogs_assert(mme_ue);
+    ogs_assert(buffer);
+    ogs_assert(length);
+
+    ogs_debug("[EMM] Downlink NAS transport");
+    ogs_debug("    IMSI[%s]", mme_ue->imsi_bcd);
+
+    rv = emm_build_downlink_nas_transport(&emmbuf, mme_ue, buffer, length);
     ogs_assert(rv == OGS_OK && emmbuf);
 
     rv = nas_send_to_downlink_nas_transport(mme_ue, emmbuf);

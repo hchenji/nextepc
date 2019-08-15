@@ -201,11 +201,25 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
             e->s1ap_message = &s1ap_message;
             ogs_fsm_dispatch(&enb->sm, e);
         } else {
-            ogs_error("Cannot process S1AP message");
+            ogs_warn("Cannot process S1AP message");
+            rv = s1ap_send_error_indication(
+                    enb, NULL, NULL, S1AP_Cause_PR_protocol, 
+                    S1AP_CauseProtocol_abstract_syntax_error_falsely_constructed_message);
+            ogs_assert(rv == OGS_OK);
         }
 
         s1ap_free_pdu(&s1ap_message);
         ogs_pkbuf_free(pkbuf);
+        break;
+
+    case MME_EVT_S1AP_TIMER:
+        enb_ue = e->enb_ue;
+        ogs_assert(enb_ue);
+        enb = e->enb;
+        ogs_assert(enb);
+        ogs_assert(OGS_FSM_STATE(&enb->sm));
+
+        ogs_fsm_dispatch(&enb->sm, e);
         break;
 
     case MME_EVT_EMM_MESSAGE:
@@ -260,12 +274,17 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
 
         ogs_fsm_dispatch(&mme_ue->sm, e);
         if (OGS_FSM_CHECK(&mme_ue->sm, emm_state_exception)) {
-            rv = mme_send_delete_session_or_ue_context_release(
-                    mme_ue, enb_ue);
-            ogs_assert(rv == OGS_OK);
+            mme_send_delete_session_or_ue_context_release(mme_ue, enb_ue);
         }
 
         ogs_pkbuf_free(pkbuf);
+        break;
+    case MME_EVT_EMM_TIMER:
+        mme_ue = e->mme_ue;
+        ogs_assert(mme_ue);
+        ogs_assert(OGS_FSM_STATE(&mme_ue->sm));
+
+        ogs_fsm_dispatch(&mme_ue->sm, e);
         break;
 
     case MME_EVT_ESM_MESSAGE:
@@ -277,7 +296,12 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
         ogs_assert(nas_esm_decode(&nas_message, pkbuf) == OGS_OK);
 
         bearer = mme_bearer_find_or_add_by_message(mme_ue, &nas_message);
-        ogs_assert(bearer);
+        if (!bearer) {
+            ogs_error("mme_bearer_find_or_add_by_message() failed");
+            ogs_pkbuf_free(pkbuf);
+            break;
+        }
+
         sess = bearer->sess;
         ogs_assert(sess);
         default_bearer = mme_default_bearer_in_sess(sess);
@@ -307,12 +331,19 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
              * [Enhancement] - Probably Invalid APN 
              * At this point, we'll forcely release UE context
              */
-            rv = mme_send_delete_session_or_ue_context_release(
+            mme_send_delete_session_or_ue_context_release(
                     mme_ue, mme_ue->enb_ue);
-            ogs_assert(rv == OGS_OK);
         }
 
         ogs_pkbuf_free(pkbuf);
+        break;
+
+    case MME_EVT_ESM_TIMER:
+        bearer = e->bearer;
+        ogs_assert(bearer);
+        ogs_assert(OGS_FSM_STATE(&bearer->sm));
+
+        ogs_fsm_dispatch(&bearer->sm, e);
         break;
 
     case MME_EVT_S6A_MESSAGE:
@@ -335,6 +366,7 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
             enb_ue = mme_ue->enb_ue;
             ogs_assert(enb_ue);
 
+            CLEAR_ENB_UE_TIMER(enb_ue->t_ue_context_release);
             rv = s1ap_send_ue_context_release_command(enb_ue,
                     S1AP_Cause_PR_nas, S1AP_CauseNas_normal_release,
                     S1AP_UE_CTX_REL_UE_CONTEXT_REMOVE, 0);
@@ -535,6 +567,14 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
         ogs_fsm_dispatch(&vlr->sm, e);
 
         ogs_pkbuf_free(pkbuf);
+        break;
+
+    case MME_EVT_SGSAP_TIMER:
+        vlr = e->vlr;
+        ogs_assert(vlr);
+        ogs_assert(OGS_FSM_STATE(&vlr->sm));
+
+        ogs_fsm_dispatch(&vlr->sm, e);
         break;
 
     default:

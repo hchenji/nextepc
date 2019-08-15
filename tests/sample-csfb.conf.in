@@ -9,7 +9,6 @@ mme:
     freeDiameter:
       identity: mme.localdomain
       realm: localdomain
-      no_sctp: true
       listen_on: 127.0.0.2
       load_extension:
         - module: @abs_top_builddir@/lib/@FREEDIAMETER_DIR@/extensions/dbg_msg_dumps/.libs/dbg_msg_dumps.so
@@ -30,23 +29,50 @@ mme:
     gtpc:
       addr: 127.0.0.1
     sgsap:
-      addr: 127.0.0.2
-      plmn_id:
-        mcc: 901
-        mnc: 70
-      tac: 7
-      lac: 2342
+      - addr: 127.0.0.2
+        map:
+          tai:
+            plmn_id:
+              mcc: 901
+              mnc: 70
+            tac: 7
+          lai:
+            plmn_id:
+              mcc: 901
+              mnc: 70
+            lac: 2342
+        map:
+          tai:
+            plmn_id:
+              mcc: 724
+              mnc: 21
+            tac: 12345
+          lai:
+            plmn_id:
+              mcc: 724
+              mnc: 21
+            lac: 51544
     gummei: 
-      plmn_id:
-        mcc: 901
-        mnc: 70
-      mme_gid: 2
-      mme_code: 1
+      - plmn_id:
+          mcc: 901
+          mnc: 70
+        mme_gid: 2
+        mme_code: 1
+      - plmn_id:
+          mcc: 724
+          mnc: 21
+        mme_gid: 2
+        mme_code: 1
     tai:
       plmn_id:
         mcc: 901
         mnc: 70
       tac: 7
+    tai:
+      plmn_id:
+        mcc: 724
+        mnc: 21
+      tac: 12345
     security:
         integrity_order : [ EIA1, EIA2, EIA0 ]
         ciphering_order : [ EEA0, EEA1, EEA2 ]
@@ -58,7 +84,6 @@ hss:
     freeDiameter:
       identity: hss.localdomain
       realm: localdomain
-      no_sctp: true
       listen_on: 127.0.0.4
       load_extension:
         - module: @abs_top_builddir@/lib/@FREEDIAMETER_DIR@/extensions/dbg_msg_dumps/.libs/dbg_msg_dumps.so
@@ -84,7 +109,6 @@ pgw:
     freeDiameter:
       identity: pgw.localdomain
       realm: localdomain
-      no_sctp: true
       listen_on: 127.0.0.3
       load_extension:
         - module: @abs_top_builddir@/lib/@FREEDIAMETER_DIR@/extensions/dbg_msg_dumps/.libs/dbg_msg_dumps.so
@@ -118,7 +142,6 @@ pcrf:
     freeDiameter:
       identity: pcrf.localdomain
       realm: localdomain
-      no_sctp: true
       listen_on: 127.0.0.5
       load_extension:
         - module: @abs_top_builddir@/lib/@FREEDIAMETER_DIR@/extensions/dbg_msg_dumps/.libs/dbg_msg_dumps.so

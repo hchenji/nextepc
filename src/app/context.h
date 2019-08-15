@@ -62,13 +62,15 @@ typedef struct _config_t {
         int sgw;
         int pgw;
         int vlr;
+        int csmap;
         int enb;
         int ue;
-        struct {
-            int pool;
-        } packet;
     } max;
 
+    struct {
+        ogs_pkbuf_config_t defconfig;
+        int packet;
+    } pool;
 } config_t;
 
 typedef struct _context_t {
