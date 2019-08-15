@@ -28,7 +28,7 @@ services:
       NEPC_PGW_GTPC_ADDR: 127.0.0.3
       NEPC_PGW_GTPU_ADDR: 127.0.0.3
       NEPC_MME_SGW_TLADDR: 192.168.44.10
-      NEPC_MME_ENB_TLADDR: 1.1.1.1
+      # NEPC_MME_ENB_TLADDR: 1.1.1.1
     volumes:
       - ./freeDiameter.allin1:/etc/nextepc/freeDiameter
       - ./build-dnet/nextepc.allin1.conf:/etc/nextepc/nextepc.conf
@@ -65,7 +65,7 @@ services:
       NEPC_SGW_GTPC_ADDR: sgw.localdomain
       NEPC_PGW_GTPC_ADDR: pgw.localdomain
       NEPC_MME_SGW_TLADDR: 192.168.44.10
-      NEPC_MME_ENB_TLADDR: 1.1.1.1
+      # NEPC_MME_ENB_TLADDR: 1.1.1.1
     command: /bin/bash -c "/usr/bin/nextepc-mmed -f /etc/nextepc/mme.conf"
     volumes:
       - ./freeDiameter:/etc/nextepc/freeDiameter

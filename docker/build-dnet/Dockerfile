@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y libbson-1.0-0 libcurl3 libgnutls30 libm
 
 RUN apt-get install -y iputils-ping dnsutils
 
-COPY libogs*_${arch}.deb /root/
-COPY nextepc-container-epc*_${arch}.deb /root/
+COPY libogs*1.2.1_${arch}.deb /root/
+COPY nextepc-container-epc*0.5.2_${arch}.deb /root/
 
 RUN dpkg -i /root/libogs*.deb && dpkg -i /root/nextepc-container-epc*.deb 
 
