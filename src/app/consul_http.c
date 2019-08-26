@@ -41,6 +41,7 @@ CURLcode curl_get(char *url, char *buf) {
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, buf);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, true);
+	curl_easy_setopt(curl, CURLOPT_TCP_FASTOPEN, 1L);
 
 	res = curl_easy_perform(curl);
 
@@ -72,6 +73,7 @@ CURLcode curl_put(char *url, char *data, char *response) {
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, response);
+	curl_easy_setopt(curl, CURLOPT_TCP_FASTOPEN, 1L);
 
 	res = curl_easy_perform(curl);
 
