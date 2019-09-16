@@ -132,10 +132,21 @@ int fd_tcp_client( int *sock, sSA * sa, socklen_t salen )
 	
 	/* Set the socket options */
 	CHECK_FCT(  fd_tcp_setsockopt(sa->sa_family, s)  );
-	
+
+	//	bind the damn client socket to the correct source IP
+	if (getenv("NEPC_FD_CLIENT_SRC_ADDR")) {
+		struct sockaddr_in myaddr;
+
+		myaddr.sin_family = AF_INET;
+		myaddr.sin_port = htons(0);
+		inet_pton(AF_INET, getenv("NEPC_FD_CLIENT_SRC_ADDR"), &(myaddr.sin_addr));
+		bind(s, (struct sockaddr*)&myaddr, sizeof myaddr);
+	}
+
+
 	/* Cleanup if we are cancelled */
 	pthread_cleanup_push(fd_cleanup_socket, &s);
-	
+
 	/* Try connecting to the remote address */
 	ret = connect(s, sa, salen);
 	
