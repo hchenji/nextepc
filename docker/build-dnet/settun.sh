@@ -1,5 +1,8 @@
 #!/bin/sh
 
+mkdir -p /dev/net
+mknod /dev/net/tun c 10 200
+
 if ! grep "pgwtun" /proc/net/dev > /dev/null; then
     ip tuntap add name pgwtun mode tun
 fi

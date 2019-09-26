@@ -18,4 +18,6 @@ RUN dpkg -i /root/libogs*.deb && dpkg -i /root/nextepc-container-epc*.deb
 RUN [ "/bin/bash", "-c", "mkdir /var/run/nextepc-{epc,mme,sgw,pgw,pcrf,hss}d" ]
 
 COPY nextepc.allin1.conf /etc/nextepc/nextepc.conf
+COPY confs/*.conf /etc/nextepc/
+COPY freeDiameter/* /etc/nextepc/freeDiameter/
 COPY settun.sh /root
