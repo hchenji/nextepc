@@ -2,7 +2,8 @@ FROM debian:buster-slim
 
 MAINTAINER Harsha Chenji <chenji@ohio.edu>
 
-ARG arch=amd64
+ARG arch
+ENV arch $arch
 
 WORKDIR /root
 
