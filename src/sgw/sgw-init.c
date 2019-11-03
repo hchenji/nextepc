@@ -17,9 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "gtp/gtp-xact.h"
-
-#include "app/context.h"
 #include "sgw-context.h"
 #include "sgw-sm.h"
 #include "sgw-event.h"
@@ -36,13 +33,14 @@ int sgw_initialize()
     sgw_context_init();
     sgw_event_init();
 
-    rv = gtp_xact_init(sgw_self()->timer_mgr);
+    rv = ogs_gtp_xact_init(sgw_self()->timer_mgr, 512);
     if (rv != OGS_OK) return rv;
 
     rv = sgw_context_parse_config();
     if (rv != OGS_OK) return rv;
 
-    rv = context_setup_log_module();
+    rv = ogs_log_config_domain(
+            ogs_config()->logger.domain, ogs_config()->logger.level);
     if (rv != OGS_OK) return rv;
 
     thread = ogs_thread_create(sgw_main, NULL);
@@ -63,7 +61,7 @@ void sgw_terminate(void)
 
     sgw_context_final();
 
-    gtp_xact_final();
+    ogs_gtp_xact_final();
 
     sgw_event_final();
 }

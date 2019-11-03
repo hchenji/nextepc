@@ -17,7 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "app/context.h"
 #include "pcrf-context.h"
 #include "pcrf-fd-path.h"
 
@@ -32,7 +31,8 @@ int pcrf_initialize(void)
     rv = pcrf_context_parse_config();
     if (rv != OGS_OK) return rv;
 
-    rv = context_setup_log_module();
+    rv = ogs_log_config_domain(
+            ogs_config()->logger.domain, ogs_config()->logger.level);
     if (rv != OGS_OK) return rv;
 
     rv = pcrf_db_init();

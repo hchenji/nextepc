@@ -20,8 +20,15 @@
 #ifndef PGW_CONTEXT_H
 #define PGW_CONTEXT_H
 
-#include "gtp/gtp-types.h"
-#include "gtp/gtp-message.h"
+#include "pgw-config.h"
+
+#if HAVE_NET_IF_H
+#include <net/if.h>
+#endif
+
+#include "ogs-gtp.h"
+#include "ogs-diameter-gx.h"
+#include "ogs-app.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,16 +42,13 @@ extern int __pgw_log_domain;
 #undef OGS_LOG_DOMAIN
 #define OGS_LOG_DOMAIN __pgw_log_domain
 
-typedef struct gtp_node_s gtp_node_t;
-typedef struct fd_config_s fd_config_t;
-
 typedef struct pgw_context_s {
-    const char*     fd_conf_path;   /* PGW freeDiameter conf path */
-    fd_config_t     *fd_config;     /* PGW freeDiameter config */
+    const char*         diam_conf_path;   /* PGW Diameter conf path */
+    ogs_diam_config_t   *diam_config;     /* PGW Diameter config */
 
     uint32_t        gtpc_port;      /* Default: PGW GTP-C local port */
     uint32_t        gtpu_port;      /* Default: PGW GTP-U local port */
-    const char      *tun_ifname;    /* Default:: pgwtun */
+    const char      *tun_ifname;    /* Default: ogstun */
 
     ogs_list_t      gtpc_list;      /* PGW GTPC IPv4 Server List */
     ogs_list_t      gtpc_list6;     /* PGW GTPC IPv6 Server List */
@@ -109,7 +113,7 @@ typedef struct pgw_subnet_s {
 
     ogs_ipsubnet_t  sub;                /* Subnet : cafe::0/64 */
     ogs_ipsubnet_t  gw;                 /* Gateway : cafe::1 */
-    char            apn[MAX_APN_LEN];   /* APN : "internet", "volte", .. */
+    char            apn[OGS_MAX_APN_LEN];   /* APN : "internet", "volte", .. */
 
     int             family;             /* AF_INET or AF_INET6 */
     uint8_t         prefixlen;          /* prefixlen */
@@ -129,23 +133,23 @@ typedef struct pgw_sess_s {
     char            *gx_sid;        /* Gx Session ID */
 
     /* IMSI */
-    uint8_t         imsi[MAX_IMSI_LEN];
+    uint8_t         imsi[OGS_MAX_IMSI_LEN];
     int             imsi_len;
-    char            imsi_bcd[MAX_IMSI_BCD_LEN+1];
+    char            imsi_bcd[OGS_MAX_IMSI_BCD_LEN+1];
 
     /* APN Configuration */
-    pdn_t           pdn;
+    ogs_pdn_t       pdn;
     pgw_ue_ip_t*    ipv4;
     pgw_ue_ip_t*    ipv6;
 
     /* User-Lication-Info */
-    tai_t           tai;
-    e_cgi_t         e_cgi;
+    ogs_tai_t       tai;
+    ogs_e_cgi_t     e_cgi;
 
     ogs_list_t      bearer_list;
 
     /* Related Context */
-    gtp_node_t      *gnode;
+    ogs_gtp_node_t  *gnode;
 } pgw_sess_t;
 
 typedef struct pgw_bearer_s {
@@ -158,7 +162,7 @@ typedef struct pgw_bearer_s {
     uint32_t        sgw_s5u_teid;   /* SGW_S5U is received from SGW */
 
     char            *name;          /* PCC Rule Name */
-    qos_t           qos;            /* QoS Infomration */
+    ogs_qos_t       qos;            /* QoS Infomration */
 
     /* Packet Filter Identifier Generator(1~15) */
     uint8_t         pf_identifier;
@@ -166,7 +170,7 @@ typedef struct pgw_bearer_s {
     ogs_list_t      pf_list;
 
     pgw_sess_t      *sess;
-    gtp_node_t      *gnode;
+    ogs_gtp_node_t  *gnode;
 } pgw_bearer_t;
 
 typedef struct pgw_rule_s {
@@ -215,14 +219,14 @@ pgw_context_t *pgw_self(void);
 
 int pgw_context_parse_config(void);
 
-gtp_node_t *pgw_sgw_add_by_message(gtp_message_t *message);
-pgw_sess_t *pgw_sess_add_by_message(gtp_message_t *message);
+ogs_gtp_node_t *pgw_sgw_add_by_message(ogs_gtp_message_t *message);
+pgw_sess_t *pgw_sess_add_by_message(ogs_gtp_message_t *message);
 
 pgw_sess_t *pgw_sess_add(
         uint8_t *imsi, int imsi_len, char *apn,
         uint8_t pdn_type, uint8_t ebi);
 int pgw_sess_remove(pgw_sess_t *sess);
-void pgw_sess_remove_all();
+void pgw_sess_remove_all(void);
 pgw_sess_t *pgw_sess_find(uint32_t index);
 pgw_sess_t *pgw_sess_find_by_teid(uint32_t teid);
 
@@ -249,15 +253,15 @@ pgw_pf_t *pgw_pf_find_by_id(pgw_bearer_t *pgw_bearer, uint8_t id);
 pgw_pf_t *pgw_pf_first(pgw_bearer_t *bearer);
 pgw_pf_t *pgw_pf_next(pgw_pf_t *pf);
 
-int pgw_ue_pool_generate();
+int pgw_ue_pool_generate(void);
 pgw_ue_ip_t *pgw_ue_ip_alloc(int family, const char *apn);
 int pgw_ue_ip_free(pgw_ue_ip_t *ip);
 
 pgw_dev_t *pgw_dev_add(const char *ifname);
 int pgw_dev_remove(pgw_dev_t *dev);
-void pgw_dev_remove_all();
+void pgw_dev_remove_all(void);
 pgw_dev_t *pgw_dev_find_by_ifname(const char *ifname);
-pgw_dev_t *pgw_dev_first();
+pgw_dev_t *pgw_dev_first(void);
 pgw_dev_t *pgw_dev_next(pgw_dev_t *dev);
 
 pgw_subnet_t *pgw_subnet_add(
@@ -265,8 +269,8 @@ pgw_subnet_t *pgw_subnet_add(
         const char *apn, const char *ifname);
 pgw_subnet_t *pgw_subnet_next(pgw_subnet_t *subnet);
 int pgw_subnet_remove(pgw_subnet_t *subnet);
-void pgw_subnet_remove_all();
-pgw_subnet_t *pgw_subnet_first();
+void pgw_subnet_remove_all(void);
+pgw_subnet_t *pgw_subnet_first(void);
 pgw_subnet_t *gw_subnet_next(pgw_subnet_t *subnet);
 
 #ifdef __cplusplus

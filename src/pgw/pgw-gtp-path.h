@@ -21,14 +21,14 @@
 #define PGW_PATH_H
 
 #include "ogs-tun.h"
-#include "gtp/gtp-xact.h"
+#include "ogs-gtp.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int pgw_gtp_open();
-void pgw_gtp_close();
+int pgw_gtp_open(void);
+void pgw_gtp_close(void);
 
 #ifdef __cplusplus
 }

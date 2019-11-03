@@ -17,22 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <mongoc.h>
-#include <yaml.h>
-
-#include "gtp/gtp-types.h"
-#include "gtp/gtp-conv.h"
-#include "gtp/gtp-node.h"
-#include "gtp/gtp-path.h"
-#include "gtp/gtp-xact.h"
-
-#include "fd/fd-lib.h"
-
-#include "app/context.h"
 #include "pgw-context.h"
 
 static pgw_context_t self;
-static fd_config_t g_fd_conf;
+static ogs_diam_config_t g_diam_conf;
 
 int __pgw_log_domain;
 
@@ -46,17 +34,19 @@ static OGS_POOL(pgw_pf_pool, pgw_pf_t);
 
 static int context_initiaized = 0;
 
-void pgw_context_init()
+void pgw_context_init(void)
 {
     ogs_assert(context_initiaized == 0);
 
     /* Initial FreeDiameter Config */
-    memset(&g_fd_conf, 0, sizeof(fd_config_t));
+    memset(&g_diam_conf, 0, sizeof(ogs_diam_config_t));
 
     /* Initialize PGW context */
     memset(&self, 0, sizeof(pgw_context_t));
-    self.fd_config = &g_fd_conf;
+    self.diam_config = &g_diam_conf;
 
+    ogs_log_install_domain(&__ogs_gtp_domain, "gtp", ogs_core()->log.level);
+    ogs_log_install_domain(&__ogs_diam_domain, "diam", ogs_core()->log.level);
     ogs_log_install_domain(&__pgw_log_domain, "pgw", ogs_core()->log.level);
 
     ogs_list_init(&self.gtpc_list);
@@ -64,7 +54,7 @@ void pgw_context_init()
     ogs_list_init(&self.gtpu_list);
     ogs_list_init(&self.gtpu_list6);
 
-    gtp_node_init();
+    ogs_gtp_node_init(512);
     ogs_list_init(&self.sgw_s5c_list);
     ogs_list_init(&self.sgw_s5u_list);
 
@@ -73,17 +63,17 @@ void pgw_context_init()
     ogs_list_init(&self.subnet_list);
     ogs_pool_init(&pgw_subnet_pool, MAX_NUM_OF_SUBNET);
 
-    ogs_pool_init(&pgw_sess_pool, context_self()->pool.sess);
-    ogs_pool_init(&pgw_bearer_pool, context_self()->pool.bearer);
+    ogs_pool_init(&pgw_sess_pool, ogs_config()->pool.sess);
+    ogs_pool_init(&pgw_bearer_pool, ogs_config()->pool.bearer);
 
-    ogs_pool_init(&pgw_pf_pool, context_self()->pool.pf);
+    ogs_pool_init(&pgw_pf_pool, ogs_config()->pool.pf);
 
     ogs_list_init(&self.sess_list);
 
     context_initiaized = 1;
 }
 
-void pgw_context_final()
+void pgw_context_final(void)
 {
     ogs_assert(context_initiaized == 1);
 
@@ -99,69 +89,67 @@ void pgw_context_final()
     ogs_pool_final(&pgw_dev_pool);
     ogs_pool_final(&pgw_subnet_pool);
 
-    gtp_node_remove_all(&self.sgw_s5c_list);
-    gtp_node_remove_all(&self.sgw_s5u_list);
-    gtp_node_final();
+    ogs_gtp_node_remove_all(&self.sgw_s5c_list);
+    ogs_gtp_node_remove_all(&self.sgw_s5u_list);
+    ogs_gtp_node_final();
 
     context_initiaized = 0;
 }
 
-pgw_context_t *pgw_self()
+pgw_context_t *pgw_self(void)
 {
     return &self;
 }
 
-static int pgw_context_prepare()
+static int pgw_context_prepare(void)
 {
-    self.gtpc_port = GTPV2_C_UDP_PORT;
-    self.gtpu_port = GTPV1_U_UDP_PORT;
-    self.fd_config->cnf_port = DIAMETER_PORT;
-    self.fd_config->cnf_port_tls = DIAMETER_SECURE_PORT;
+    self.gtpc_port = OGS_GTPV2_C_UDP_PORT;
+    self.gtpu_port = OGS_GTPV1_U_UDP_PORT;
+    self.diam_config->cnf_port = DIAMETER_PORT;
+    self.diam_config->cnf_port_tls = DIAMETER_SECURE_PORT;
 
-    self.tun_ifname = "pgwtun";
+    self.tun_ifname = "ogstun";
 
     return OGS_OK;
 }
 
-static int pgw_context_validation()
+static int pgw_context_validation(void)
 {
-    if (self.fd_conf_path == NULL &&
-        (self.fd_config->cnf_diamid == NULL ||
-        self.fd_config->cnf_diamrlm == NULL ||
-        self.fd_config->cnf_addr == NULL)) {
+    if (self.diam_conf_path == NULL &&
+        (self.diam_config->cnf_diamid == NULL ||
+        self.diam_config->cnf_diamrlm == NULL ||
+        self.diam_config->cnf_addr == NULL)) {
         ogs_error("No pgw.freeDiameter in '%s'",
-                context_self()->config.path);
+                ogs_config()->file);
         return OGS_ERROR;
     }
     if (ogs_list_first(&self.gtpc_list) == NULL &&
         ogs_list_first(&self.gtpc_list6) == NULL) {
         ogs_error("No pgw.gtpc in '%s'",
-                context_self()->config.path);
+                ogs_config()->file);
         return OGS_ERROR;
     }
     if (ogs_list_first(&self.gtpu_list) == NULL &&
         ogs_list_first(&self.gtpu_list6) == NULL) {
         ogs_error("No pgw.gtpu in '%s'",
-                context_self()->config.path);
+                ogs_config()->file);
         return OGS_ERROR;
     }
     if (self.dns[0] == NULL && self.dns6[0] == NULL) {
         ogs_error("No pgw.dns in '%s'",
-                context_self()->config.path);
+                ogs_config()->file);
         return OGS_ERROR;
     }
     return OGS_OK;
 }
 
-int pgw_context_parse_config()
+int pgw_context_parse_config(void)
 {
     int rv;
-    config_t *config = &context_self()->config;
     yaml_document_t *document = NULL;
     ogs_yaml_iter_t root_iter;
 
-    ogs_assert(config);
-    document = config->document;
+    document = ogs_config()->document;
     ogs_assert(document);
 
     rv = pgw_context_prepare();
@@ -182,7 +170,7 @@ int pgw_context_parse_config()
                         yaml_document_get_node(document, pgw_iter.pair->value);
                     ogs_assert(node);
                     if (node->type == YAML_SCALAR_NODE) {
-                        self.fd_conf_path = ogs_yaml_iter_value(&pgw_iter);
+                        self.diam_conf_path = ogs_yaml_iter_value(&pgw_iter);
                     } else if (node->type == YAML_MAPPING_NODE) {
                         ogs_yaml_iter_t fd_iter;
                         ogs_yaml_iter_recurse(&pgw_iter, &fd_iter);
@@ -191,19 +179,19 @@ int pgw_context_parse_config()
                             const char *fd_key = ogs_yaml_iter_key(&fd_iter);
                             ogs_assert(fd_key);
                             if (!strcmp(fd_key, "identity")) {
-                                self.fd_config->cnf_diamid = 
+                                self.diam_config->cnf_diamid = 
                                     ogs_yaml_iter_value(&fd_iter);
                             } else if (!strcmp(fd_key, "realm")) {
-                                self.fd_config->cnf_diamrlm = 
+                                self.diam_config->cnf_diamrlm = 
                                     ogs_yaml_iter_value(&fd_iter);
                             } else if (!strcmp(fd_key, "port")) {
                                 const char *v = ogs_yaml_iter_value(&fd_iter);
-                                if (v) self.fd_config->cnf_port = atoi(v);
+                                if (v) self.diam_config->cnf_port = atoi(v);
                             } else if (!strcmp(fd_key, "sec_port")) {
                                 const char *v = ogs_yaml_iter_value(&fd_iter);
-                                if (v) self.fd_config->cnf_port_tls = atoi(v);
+                                if (v) self.diam_config->cnf_port_tls = atoi(v);
                             } else if (!strcmp(fd_key, "listen_on")) {
-                                self.fd_config->cnf_addr = 
+                                self.diam_config->cnf_addr = 
                                     ogs_yaml_iter_value(&fd_iter);
                             } else if (!strcmp(fd_key, "load_extension")) {
                                 ogs_yaml_iter_t ext_array, ext_iter;
@@ -243,13 +231,13 @@ int pgw_context_parse_config()
                                     }
 
                                     if (module) {
-                                        self.fd_config->
-                                            ext[self.fd_config->num_of_ext].
+                                        self.diam_config->
+                                            ext[self.diam_config->num_of_ext].
                                                 module = module;
-                                        self.fd_config->
-                                            ext[self.fd_config->num_of_ext].
+                                        self.diam_config->
+                                            ext[self.diam_config->num_of_ext].
                                                 conf = conf;
-                                        self.fd_config->num_of_ext++;
+                                        self.diam_config->num_of_ext++;
                                     }
                                 } while (ogs_yaml_iter_type(&ext_array) ==
                                         YAML_SEQUENCE_NODE);
@@ -296,16 +284,16 @@ int pgw_context_parse_config()
                                     }
 
                                     if (identity && addr) {
-                                        self.fd_config->
-                                            conn[self.fd_config->num_of_conn].
+                                        self.diam_config->
+                                            conn[self.diam_config->num_of_conn].
                                                 identity = identity;
-                                        self.fd_config->
-                                            conn[self.fd_config->num_of_conn].
+                                        self.diam_config->
+                                            conn[self.diam_config->num_of_conn].
                                                 addr = addr;
-                                        self.fd_config->
-                                            conn[self.fd_config->num_of_conn].
+                                        self.diam_config->
+                                            conn[self.diam_config->num_of_conn].
                                                 port = port;
-                                        self.fd_config->num_of_conn++;
+                                        self.diam_config->num_of_conn++;
                                     }
                                 } while (ogs_yaml_iter_type(&conn_array) ==
                                         YAML_SEQUENCE_NODE);
@@ -319,7 +307,7 @@ int pgw_context_parse_config()
                     do {
                         int family = AF_UNSPEC;
                         int i, num = 0;
-                        const char *hostname[MAX_NUM_OF_HOSTNAME];
+                        const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
                         uint16_t port = self.gtpc_port;
                         const char *dev = NULL;
                         ogs_sockaddr_t *addr = NULL;
@@ -368,7 +356,7 @@ int pgw_context_parse_config()
                                             break;
                                     }
 
-                                    ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
+                                    ogs_assert(num <= OGS_MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
 
@@ -402,7 +390,7 @@ int pgw_context_parse_config()
                         }
 
                         if (addr) {
-                            if (context_self()->config.parameter.no_ipv4 == 0) {
+                            if (ogs_config()->parameter.no_ipv4 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -410,7 +398,7 @@ int pgw_context_parse_config()
                                         &self.gtpc_list, AF_INET, dup);
                             }
 
-                            if (context_self()->config.parameter.no_ipv6 == 0) {
+                            if (ogs_config()->parameter.no_ipv6 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -423,9 +411,9 @@ int pgw_context_parse_config()
 
                         if (dev) {
                             rv = ogs_socknode_probe(
-                                    context_self()->config.parameter.no_ipv4 ?
+                                    ogs_config()->parameter.no_ipv4 ?
                                         NULL : &self.gtpc_list,
-                                    context_self()->config.parameter.no_ipv6 ?
+                                    ogs_config()->parameter.no_ipv6 ?
                                         NULL : &self.gtpc_list6,
                                     dev, self.gtpc_port);
                             ogs_assert(rv == OGS_OK);
@@ -437,9 +425,9 @@ int pgw_context_parse_config()
                     if (ogs_list_first(&self.gtpc_list) == NULL &&
                         ogs_list_first(&self.gtpc_list6) == NULL) {
                         rv = ogs_socknode_probe(
-                                context_self()->config.parameter.no_ipv4 ?
+                                ogs_config()->parameter.no_ipv4 ?
                                     NULL : &self.gtpc_list,
-                                context_self()->config.parameter.no_ipv6 ?
+                                ogs_config()->parameter.no_ipv6 ?
                                     NULL : &self.gtpc_list6,
                                 NULL, self.gtpc_port);
                         ogs_assert(rv == OGS_OK);
@@ -450,7 +438,7 @@ int pgw_context_parse_config()
                     do {
                         int family = AF_UNSPEC;
                         int i, num = 0;
-                        const char *hostname[MAX_NUM_OF_HOSTNAME];
+                        const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
                         uint16_t port = self.gtpu_port;
                         const char *dev = NULL;
                         ogs_sockaddr_t *addr = NULL;
@@ -498,7 +486,7 @@ int pgw_context_parse_config()
                                             break;
                                     }
 
-                                    ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
+                                    ogs_assert(num <= OGS_MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
 
@@ -529,7 +517,7 @@ int pgw_context_parse_config()
                         }
 
                         if (addr) {
-                            if (context_self()->config.parameter.no_ipv4 == 0) {
+                            if (ogs_config()->parameter.no_ipv4 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -537,7 +525,7 @@ int pgw_context_parse_config()
                                         &self.gtpu_list, AF_INET, dup);
                             }
 
-                            if (context_self()->config.parameter.no_ipv6 == 0) {
+                            if (ogs_config()->parameter.no_ipv6 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -550,9 +538,9 @@ int pgw_context_parse_config()
 
                         if (dev) {
                             rv = ogs_socknode_probe(
-                                    context_self()->config.parameter.no_ipv4 ?
+                                    ogs_config()->parameter.no_ipv4 ?
                                         NULL : &self.gtpu_list,
-                                    context_self()->config.parameter.no_ipv6 ?
+                                    ogs_config()->parameter.no_ipv6 ?
                                         NULL : &self.gtpu_list6,
                                     dev, self.gtpu_port);
                             ogs_assert(rv == OGS_OK);
@@ -564,9 +552,9 @@ int pgw_context_parse_config()
                     if (ogs_list_first(&self.gtpu_list) == NULL &&
                         ogs_list_first(&self.gtpu_list6) == NULL) {
                         rv = ogs_socknode_probe(
-                                context_self()->config.parameter.no_ipv4 ?
+                                ogs_config()->parameter.no_ipv4 ?
                                     NULL : &self.gtpu_list,
-                                context_self()->config.parameter.no_ipv6 ?
+                                ogs_config()->parameter.no_ipv6 ?
                                     NULL : &self.gtpu_list6,
                                 NULL, self.gtpu_port);
                         ogs_assert(rv == OGS_OK);
@@ -769,8 +757,10 @@ pgw_sess_t *pgw_sess_add(
 
     ogs_pool_alloc(&pgw_sess_pool, &sess);
     ogs_assert(sess);
+    memset(sess, 0, sizeof *sess);
+
     sess->index = ogs_pool_index(&pgw_sess_pool, sess);
-    ogs_assert(sess->index > 0 && sess->index <= context_self()->pool.sess);
+    ogs_assert(sess->index > 0 && sess->index <= ogs_config()->pool.sess);
 
     sess->gnode = NULL;
 
@@ -782,22 +772,22 @@ pgw_sess_t *pgw_sess_add(
     ogs_buffer_to_bcd(sess->imsi, sess->imsi_len, sess->imsi_bcd);
 
     /* Set APN */
-    ogs_cpystrn(sess->pdn.apn, apn, MAX_APN_LEN+1);
+    ogs_cpystrn(sess->pdn.apn, apn, OGS_MAX_APN_LEN+1);
 
     ogs_list_init(&sess->bearer_list);
 
-    ogs_cpystrn(sess->pdn.apn, apn, MAX_APN_LEN+1);
+    ogs_cpystrn(sess->pdn.apn, apn, OGS_MAX_APN_LEN+1);
 
     bearer = pgw_bearer_add(sess);
     ogs_assert(bearer);
     bearer->ebi = ebi;
 
     sess->pdn.paa.pdn_type = pdn_type;
-    if (pdn_type == GTP_PDN_TYPE_IPV4) {
+    if (pdn_type == OGS_GTP_PDN_TYPE_IPV4) {
         sess->ipv4 = pgw_ue_ip_alloc(AF_INET, apn);
         ogs_assert(sess->ipv4);
         sess->pdn.paa.addr = sess->ipv4->addr[0];
-    } else if (pdn_type == GTP_PDN_TYPE_IPV6) {
+    } else if (pdn_type == OGS_GTP_PDN_TYPE_IPV6) {
         sess->ipv6 = pgw_ue_ip_alloc(AF_INET6, apn);
         ogs_assert(sess->ipv6);
 
@@ -805,8 +795,8 @@ pgw_sess_t *pgw_sess_add(
         ogs_assert(subnet6);
 
         sess->pdn.paa.len = subnet6->prefixlen;
-        memcpy(sess->pdn.paa.addr6, sess->ipv6->addr, IPV6_LEN);
-    } else if (pdn_type == GTP_PDN_TYPE_IPV4V6) {
+        memcpy(sess->pdn.paa.addr6, sess->ipv6->addr, OGS_IPV6_LEN);
+    } else if (pdn_type == OGS_GTP_PDN_TYPE_IPV4V6) {
         sess->ipv4 = pgw_ue_ip_alloc(AF_INET, apn);
         ogs_assert(sess->ipv4);
         sess->ipv6 = pgw_ue_ip_alloc(AF_INET6, apn);
@@ -817,7 +807,7 @@ pgw_sess_t *pgw_sess_add(
 
         sess->pdn.paa.both.addr = sess->ipv4->addr[0];
         sess->pdn.paa.both.len = subnet6->prefixlen;
-        memcpy(sess->pdn.paa.both.addr6, sess->ipv6->addr, IPV6_LEN);
+        memcpy(sess->pdn.paa.both.addr6, sess->ipv6->addr, OGS_IPV6_LEN);
     } else
         ogs_assert_if_reached();
 
@@ -850,7 +840,7 @@ int pgw_sess_remove(pgw_sess_t *sess)
     return OGS_OK;
 }
 
-void pgw_sess_remove_all()
+void pgw_sess_remove_all(void)
 {
     pgw_sess_t *sess = NULL, *next = NULL;;
 
@@ -869,13 +859,13 @@ pgw_sess_t *pgw_sess_find_by_teid(uint32_t teid)
     return pgw_sess_find(teid);
 }
 
-gtp_node_t *pgw_sgw_add_by_message(gtp_message_t *message)
+ogs_gtp_node_t *pgw_sgw_add_by_message(ogs_gtp_message_t *message)
 {
     int rv;
-    gtp_node_t *sgw = NULL;
-    gtp_f_teid_t *sgw_s5c_teid = NULL;
+    ogs_gtp_node_t *sgw = NULL;
+    ogs_gtp_f_teid_t *sgw_s5c_teid = NULL;
 
-    gtp_create_session_request_t *req = &message->create_session_request;
+    ogs_gtp_create_session_request_t *req = &message->create_session_request;
 
     if (req->sender_f_teid_for_control_plane.presence == 0) {
         ogs_error("No Sender F-TEID");
@@ -884,27 +874,27 @@ gtp_node_t *pgw_sgw_add_by_message(gtp_message_t *message)
 
     sgw_s5c_teid = req->sender_f_teid_for_control_plane.data;
     ogs_assert(sgw_s5c_teid);
-    sgw = gtp_node_find(&pgw_self()->sgw_s5c_list, sgw_s5c_teid);
+    sgw = ogs_gtp_node_find(&pgw_self()->sgw_s5c_list, sgw_s5c_teid);
     if (!sgw) {
-        sgw = gtp_node_add(&pgw_self()->sgw_s5c_list, sgw_s5c_teid,
+        sgw = ogs_gtp_node_add(&pgw_self()->sgw_s5c_list, sgw_s5c_teid,
             pgw_self()->gtpc_port,
-            context_self()->config.parameter.no_ipv4,
-            context_self()->config.parameter.no_ipv6,
-            context_self()->config.parameter.prefer_ipv4);
+            ogs_config()->parameter.no_ipv4,
+            ogs_config()->parameter.no_ipv6,
+            ogs_config()->parameter.prefer_ipv4);
         ogs_assert(sgw);
 
-        rv = gtp_connect(pgw_self()->gtpc_sock, pgw_self()->gtpc_sock6, sgw);
+        rv = ogs_gtp_connect(pgw_self()->gtpc_sock, pgw_self()->gtpc_sock6, sgw);
         ogs_assert(rv == OGS_OK);
     }
 
     return sgw;
 }
-pgw_sess_t *pgw_sess_add_by_message(gtp_message_t *message)
+pgw_sess_t *pgw_sess_add_by_message(ogs_gtp_message_t *message)
 {
     pgw_sess_t *sess = NULL;
-    char apn[MAX_APN_LEN];
+    char apn[OGS_MAX_APN_LEN];
 
-    gtp_create_session_request_t *req = &message->create_session_request;
+    ogs_gtp_create_session_request_t *req = &message->create_session_request;
 
     if (req->imsi.presence == 0) {
         ogs_error("No IMSI");
@@ -927,7 +917,8 @@ pgw_sess_t *pgw_sess_add_by_message(gtp_message_t *message)
         return NULL;
     }
 
-    fqdn_parse(apn, req->access_point_name.data, req->access_point_name.len);
+    ogs_fqdn_parse(apn,
+            req->access_point_name.data, req->access_point_name.len);
 
     ogs_trace("pgw_sess_add_by_message() [APN:%s, PDN:%d, EDI:%d]",
             apn, req->pdn_type.u8,
@@ -949,9 +940,11 @@ pgw_bearer_t *pgw_bearer_add(pgw_sess_t *sess)
 
     ogs_pool_alloc(&pgw_bearer_pool, &bearer);
     ogs_assert(bearer);
+    memset(bearer, 0, sizeof *bearer);
+
     bearer->index = ogs_pool_index(&pgw_bearer_pool, bearer);
     ogs_assert(bearer->index > 0 && bearer->index <=
-            context_self()->pool.bearer);
+            ogs_config()->pool.bearer);
 
     bearer->name = NULL;
 
@@ -1101,8 +1094,9 @@ pgw_pf_t *pgw_pf_add(pgw_bearer_t *bearer, uint32_t precedence)
 
     ogs_pool_alloc(&pgw_pf_pool, &pf);
     ogs_assert(pf);
+    memset(pf, 0, sizeof *pf);
 
-    pf->identifier = NEXT_ID(bearer->pf_identifier, 1, 15);
+    pf->identifier = OGS_NEXT_ID(bearer->pf_identifier, 1, 15);
     pf->bearer = bearer;
 
     ogs_list_add(&bearer->pf_list, pf);
@@ -1155,7 +1149,7 @@ pgw_pf_t *pgw_pf_next(pgw_pf_t *pf)
     return ogs_list_next(pf);
 }
 
-int pgw_ue_pool_generate()
+int pgw_ue_pool_generate(void)
 {
     int j;
     pgw_subnet_t *subnet = NULL;
@@ -1196,7 +1190,7 @@ int pgw_ue_pool_generate()
             broadcast[j] = subnet->sub.sub[j] + ~subnet->sub.mask[j];
         }
 
-        for (j = 0; j < mask_count && index < context_self()->pool.sess; j++) {
+        for (j = 0; j < mask_count && index < ogs_config()->pool.sess; j++) {
             pgw_ue_ip_t *ue_ip = NULL;
             int maxbytes = 0;
             int lastindex = 0;
@@ -1328,7 +1322,7 @@ int pgw_dev_remove(pgw_dev_t *dev)
     return OGS_OK;
 }
 
-void pgw_dev_remove_all()
+void pgw_dev_remove_all(void)
 {
     pgw_dev_t *dev = NULL, *next_dev = NULL;
 
@@ -1353,7 +1347,7 @@ pgw_dev_t *pgw_dev_find_by_ifname(const char *ifname)
     return OGS_OK;
 }
 
-pgw_dev_t *pgw_dev_first()
+pgw_dev_t *pgw_dev_first(void)
 {
     return ogs_list_first(&self.dev_list);
 }
@@ -1398,7 +1392,7 @@ pgw_subnet_t *pgw_subnet_add(
     subnet->family = subnet->gw.family;
     subnet->prefixlen = atoi(mask_or_numbits);
 
-    ogs_pool_init(&subnet->pool, context_self()->pool.sess);
+    ogs_pool_init(&subnet->pool, ogs_config()->pool.sess);
 
     ogs_list_add(&self.subnet_list, subnet);
 
@@ -1418,7 +1412,7 @@ int pgw_subnet_remove(pgw_subnet_t *subnet)
     return OGS_OK;
 }
 
-void pgw_subnet_remove_all()
+void pgw_subnet_remove_all(void)
 {
     pgw_subnet_t *subnet = NULL, *next_subnet = NULL;
 
@@ -1426,7 +1420,7 @@ void pgw_subnet_remove_all()
         pgw_subnet_remove(subnet);
 }
 
-pgw_subnet_t *pgw_subnet_first()
+pgw_subnet_t *pgw_subnet_first(void)
 {
     return ogs_list_first(&self.subnet_list);
 }

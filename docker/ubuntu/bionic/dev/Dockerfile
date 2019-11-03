@@ -1,10 +1,9 @@
 ARG dist=ubuntu
-ARG tag=bionic
-ARG username=wsrg
-FROM ${username}/${dist}-${tag}-nextepc-base
+ARG tag=latest
+ARG username=acetcom
+FROM ${username}/${dist}-${tag}-open5gs-base
 
 MAINTAINER Sukchan Lee <acetcom@gmail.com>
-MAINTAINER Harsha Chenji <chenji@ohio.edu>
 
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -15,8 +14,6 @@ RUN apt-get update && \
         devscripts \
         osc \
         dput \
-        dh-autoreconf \
-        dh-systemd \
         manpages-dev \
         fakeroot \
         cscope \
@@ -29,7 +26,7 @@ RUN apt-get update && \
 
 COPY setup.sh /root
 
-ARG username=wsrg
+ARG username=acetcom
 RUN useradd -m --uid=1000 ${username} && \
     echo "${username} ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/${username} && \
     chmod 0440 /etc/sudoers.d/${username}

@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "app/context.h"
-
 #include "hss-context.h"
 #include "hss-fd-path.h"
 
@@ -33,7 +31,8 @@ int hss_initialize(void)
     rv = hss_context_parse_config();
     if (rv != OGS_OK) return rv;
 
-    rv = context_setup_log_module();
+    rv = ogs_log_config_domain(
+            ogs_config()->logger.domain, ogs_config()->logger.level);
     if (rv != OGS_OK) return rv;
 
     rv = hss_db_init();

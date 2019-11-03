@@ -32,7 +32,9 @@ int sgsap_open()
 
     ogs_list_for_each(&mme_self()->vlr_list, vlr) {
         mme_event_t e;
+
         e.vlr = vlr;
+        e.id = 0;
 
         ogs_fsm_create(&vlr->sm, sgsap_state_initial, sgsap_state_final);
         ogs_fsm_init(&vlr->sm, &e);
@@ -63,7 +65,7 @@ int sgsap_send(ogs_sock_t *sock, ogs_pkbuf_t *pkbuf,
     ogs_assert(pkbuf);
 
     sent = ogs_sctp_sendmsg(sock, pkbuf->data, pkbuf->len,
-            addr, SCTP_SGSAP_PPID, stream_no);
+            addr, OGS_SCTP_SGSAP_PPID, stream_no);
     if (sent < 0 || sent != pkbuf->len) {
         ogs_error("ogs_sctp_sendmsg error (%d:%s)", errno, strerror(errno));
         return OGS_ERROR;
@@ -115,9 +117,9 @@ int sgsap_send_to_vlr(mme_ue_t *mme_ue, ogs_pkbuf_t *pkbuf)
     ogs_assert(vlr);
 
     ogs_debug("    TAI[PLMN_ID:%06x,TAC:%d]",
-                plmn_id_hexdump(&csmap->tai.nas_plmn_id), csmap->tai.tac);
+                ogs_plmn_id_hexdump(&csmap->tai.nas_plmn_id), csmap->tai.tac);
     ogs_debug("    LAI[PLMN_ID:%06x,LAC:%d]",
-                plmn_id_hexdump(&csmap->lai.nas_plmn_id), csmap->lai.lac);
+                ogs_plmn_id_hexdump(&csmap->lai.nas_plmn_id), csmap->lai.lac);
 
     return sgsap_send_to_vlr_with_sid(vlr, pkbuf, mme_ue->vlr_ostream_id);
 }
@@ -217,7 +219,7 @@ int sgsap_send_reset_ack(mme_vlr_t *vlr)
 }
 
 int sgsap_send_uplink_unitdata(
-        mme_ue_t *mme_ue, nas_message_container_t *nas_message_container)
+        mme_ue_t *mme_ue, ogs_nas_message_container_t *nas_message_container)
 {
     int rv;
     ogs_pkbuf_t *pkbuf = NULL;

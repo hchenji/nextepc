@@ -17,23 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <yaml.h>
-
-#include <mongoc.h>
 #include "ogs-sctp.h"
 
-#include "asn1c/s1ap-message.h"
-#include "gtp/gtp-xact.h"
-#include "gtp/gtp-node.h"
-#include "gtp/gtp-path.h"
-#include "fd/fd-lib.h"
-
-#include "app/context.h"
-#include "nas-conv.h"
-#include "nas-path.h"
 #include "mme-context.h"
 #include "mme-event.h"
 #include "mme-timer.h"
+#include "nas-path.h"
 #include "s1ap-path.h"
 #include "s1ap-handler.h"
 #include "mme-sm.h"
@@ -41,7 +30,7 @@
 #define MAX_CELL_PER_ENB            8
 
 static mme_context_t self;
-static fd_config_t g_fd_conf;
+static ogs_diam_config_t g_diam_conf;
 
 int __mme_log_domain;
 int __emm_log_domain;
@@ -65,12 +54,17 @@ void mme_context_init()
     ogs_assert(context_initialized == 0);
 
     /* Initial FreeDiameter Config */
-    memset(&g_fd_conf, 0, sizeof(fd_config_t));
+    memset(&g_diam_conf, 0, sizeof(ogs_diam_config_t));
 
     /* Initialize MME context */
     memset(&self, 0, sizeof(mme_context_t));
-    self.fd_config = &g_fd_conf;
+    self.diam_config = &g_diam_conf;
 
+    ogs_log_install_domain(&__ogs_sctp_domain, "sctp", ogs_core()->log.level);
+    ogs_log_install_domain(&__ogs_s1ap_domain, "s1ap", ogs_core()->log.level);
+    ogs_log_install_domain(&__ogs_nas_domain, "nas", ogs_core()->log.level);
+    ogs_log_install_domain(&__ogs_gtp_domain, "gtp", ogs_core()->log.level);
+    ogs_log_install_domain(&__ogs_diam_domain, "diam", ogs_core()->log.level);
     ogs_log_install_domain(&__mme_log_domain, "mme", ogs_core()->log.level);
     ogs_log_install_domain(&__emm_log_domain, "emm", ogs_core()->log.level);
     ogs_log_install_domain(&__esm_log_domain, "esm", ogs_core()->log.level);
@@ -81,25 +75,25 @@ void mme_context_init()
     ogs_list_init(&self.gtpc_list);
     ogs_list_init(&self.gtpc_list6);
 
-    gtp_node_init();
+    ogs_gtp_node_init(512);
     ogs_list_init(&self.sgw_list);
     ogs_list_init(&self.pgw_list);
     ogs_list_init(&self.enb_list);
     ogs_list_init(&self.vlr_list);
     ogs_list_init(&self.csmap_list);
 
-    ogs_pool_init(&mme_sgw_pool, context_self()->config.max.sgw);
-    ogs_pool_init(&mme_pgw_pool, context_self()->config.max.pgw);
-    ogs_pool_init(&mme_vlr_pool, context_self()->config.max.vlr);
-    ogs_pool_init(&mme_csmap_pool, context_self()->config.max.csmap);
+    ogs_pool_init(&mme_sgw_pool, ogs_config()->max.sgw);
+    ogs_pool_init(&mme_pgw_pool, ogs_config()->max.pgw);
+    ogs_pool_init(&mme_vlr_pool, ogs_config()->max.vlr);
+    ogs_pool_init(&mme_csmap_pool, ogs_config()->max.csmap);
 
-    ogs_pool_init(&mme_enb_pool, context_self()->config.max.enb);
+    ogs_pool_init(&mme_enb_pool, ogs_config()->max.enb);
 
-    ogs_pool_init(&mme_ue_pool, context_self()->pool.ue);
-    ogs_pool_init(&enb_ue_pool, context_self()->pool.ue);
-    ogs_pool_init(&mme_sess_pool, context_self()->pool.sess);
-    ogs_pool_init(&mme_bearer_pool, context_self()->pool.bearer);
-    ogs_pool_init(&self.m_tmsi, context_self()->pool.ue);
+    ogs_pool_init(&mme_ue_pool, ogs_config()->pool.ue);
+    ogs_pool_init(&enb_ue_pool, ogs_config()->pool.ue);
+    ogs_pool_init(&mme_sess_pool, ogs_config()->pool.sess);
+    ogs_pool_init(&mme_bearer_pool, ogs_config()->pool.bearer);
+    ogs_pool_init(&self.m_tmsi, ogs_config()->pool.ue);
 
     self.enb_addr_hash = ogs_hash_make();
     self.enb_id_hash = ogs_hash_make();
@@ -149,100 +143,100 @@ void mme_context_final()
     ogs_pool_final(&mme_csmap_pool);
     ogs_pool_final(&mme_vlr_pool);
 
-    gtp_node_final();
+    ogs_gtp_node_final();
 
     context_initialized = 0;
 }
 
-mme_context_t *mme_self()
+mme_context_t *mme_self(void)
 {
     return &self;
 }
 
-static int mme_context_prepare()
+static int mme_context_prepare(void)
 {
     self.relative_capacity = 0xff;
 
-    self.s1ap_port = S1AP_SCTP_PORT;
-    self.gtpc_port = GTPV2_C_UDP_PORT;
-    self.sgsap_port = SGSAP_SCTP_PORT;
-    self.fd_config->cnf_port = DIAMETER_PORT;
-    self.fd_config->cnf_port_tls = DIAMETER_SECURE_PORT;
+    self.s1ap_port = OGS_S1AP_SCTP_PORT;
+    self.gtpc_port = OGS_GTPV2_C_UDP_PORT;
+    self.sgsap_port = OGS_SGSAP_SCTP_PORT;
+    self.diam_config->cnf_port = DIAMETER_PORT;
+    self.diam_config->cnf_port_tls = DIAMETER_SECURE_PORT;
 
     return OGS_OK;
 }
 
-static int mme_context_validation()
+static int mme_context_validation(void)
 {
-    if (self.fd_conf_path == NULL &&
-        (self.fd_config->cnf_diamid == NULL ||
-        self.fd_config->cnf_diamrlm == NULL ||
-        self.fd_config->cnf_addr == NULL)) {
-        ogs_error("No mme.freeDiameter in '%s'", context_self()->config.path);
+    if (self.diam_conf_path == NULL &&
+        (self.diam_config->cnf_diamid == NULL ||
+        self.diam_config->cnf_diamrlm == NULL ||
+        self.diam_config->cnf_addr == NULL)) {
+        ogs_error("No mme.freeDiameter in '%s'", ogs_config()->file);
         return OGS_ERROR;
     }
 
     if (ogs_list_first(&self.s1ap_list) == NULL &&
         ogs_list_first(&self.s1ap_list6) == NULL) {
-        ogs_error("No mme.s1ap in '%s'", context_self()->config.path);
+        ogs_error("No mme.s1ap in '%s'", ogs_config()->file);
         return OGS_RETRY;
     }
 
     if (ogs_list_first(&self.gtpc_list) == NULL &&
         ogs_list_first(&self.gtpc_list6) == NULL) {
-        ogs_error("No mme.gtpc in '%s'", context_self()->config.path);
+        ogs_error("No mme.gtpc in '%s'", ogs_config()->file);
         return OGS_RETRY;
     }
 
     if (ogs_list_first(&self.sgw_list) == NULL) {
-        ogs_error("No sgw.gtpc in '%s'", context_self()->config.path);
+        ogs_error("No sgw.gtpc in '%s'", ogs_config()->file);
         return OGS_ERROR;
     }
 
     if (ogs_list_first(&self.pgw_list) == NULL) {
-        ogs_error("No pgw.gtpc in '%s'", context_self()->config.path);
+        ogs_error("No pgw.gtpc in '%s'", ogs_config()->file);
         return OGS_ERROR;
     }
 
     if (self.max_num_of_served_gummei == 0) {
-        ogs_error("No mme.gummei in '%s'", context_self()->config.path);
+        ogs_error("No mme.gummei in '%s'", ogs_config()->file);
         return OGS_ERROR;
     }
 
     if (self.served_gummei[0].num_of_plmn_id == 0) {
-        ogs_error("No mme.gummei.plmn_id in '%s'", context_self()->config.path);
+        ogs_error("No mme.gummei.plmn_id in '%s'", ogs_config()->file);
         return OGS_ERROR;
     }
 
     if (self.served_gummei[0].num_of_mme_gid == 0) {
-        ogs_error("No mme.gummei.mme_gid in '%s'", context_self()->config.path);
+        ogs_error("No mme.gummei.mme_gid in '%s'", ogs_config()->file);
         return OGS_ERROR;
     }
 
     if (self.served_gummei[0].num_of_mme_code == 0) {
-        ogs_error("No mme.gummei.mme_code in '%s'", context_self()->config.path);
+        ogs_error("No mme.gummei.mme_code in '%s'", ogs_config()->file);
         return OGS_ERROR;
     }
 
     if (self.num_of_served_tai == 0) {
-        ogs_error("No mme.tai in '%s'", context_self()->config.path);
+        ogs_error("No mme.tai in '%s'", ogs_config()->file);
         return OGS_ERROR;
     }
 
     if (self.served_tai[0].list0.tai[0].num == 0 &&
         self.served_tai[0].list2.num == 0) {
-        ogs_error("No mme.tai.plmn_id|tac in '%s'", context_self()->config.path);
+        ogs_error("No mme.tai.plmn_id|tac in '%s'", ogs_config()->file);
         return OGS_ERROR;
     }
 
     if (self.num_of_integrity_order == 0) {
         ogs_error("No mme.security.integrity_order in '%s'",
-                context_self()->config.path);
+                ogs_config()->file);
         return OGS_ERROR;
     }
     if (self.num_of_ciphering_order == 0) {
         ogs_error("no mme.security.ciphering_order in '%s'",
-                context_self()->config.path);
+                ogs_config()->file);
         return OGS_ERROR;
     }
 
@@ -252,12 +246,10 @@ static int mme_context_validation()
 int mme_context_parse_config()
 {
     int rv;
-    config_t *config = &context_self()->config;
     yaml_document_t *document = NULL;
     ogs_yaml_iter_t root_iter;
 
-    ogs_assert(config);
-    document = config->document;
+    document = ogs_config()->document;
     ogs_assert(document);
 
     rv = mme_context_prepare();
@@ -278,7 +270,7 @@ int mme_context_parse_config()
                         yaml_document_get_node(document, mme_iter.pair->value);
                     ogs_assert(node);
                     if (node->type == YAML_SCALAR_NODE) {
-                        self.fd_conf_path = ogs_yaml_iter_value(&mme_iter);
+                        self.diam_conf_path = ogs_yaml_iter_value(&mme_iter);
                     } else if (node->type == YAML_MAPPING_NODE) {
                         ogs_yaml_iter_t fd_iter;
                         ogs_yaml_iter_recurse(&mme_iter, &fd_iter);
@@ -287,19 +279,19 @@ int mme_context_parse_config()
                             const char *fd_key = ogs_yaml_iter_key(&fd_iter);
                             ogs_assert(fd_key);
                             if (!strcmp(fd_key, "identity")) {
-                                self.fd_config->cnf_diamid = 
+                                self.diam_config->cnf_diamid = 
                                     ogs_yaml_iter_value(&fd_iter);
                             } else if (!strcmp(fd_key, "realm")) {
-                                self.fd_config->cnf_diamrlm = 
+                                self.diam_config->cnf_diamrlm = 
                                     ogs_yaml_iter_value(&fd_iter);
                             } else if (!strcmp(fd_key, "port")) {
                                 const char *v = ogs_yaml_iter_value(&fd_iter);
-                                if (v) self.fd_config->cnf_port = atoi(v);
+                                if (v) self.diam_config->cnf_port = atoi(v);
                             } else if (!strcmp(fd_key, "sec_port")) {
                                 const char *v = ogs_yaml_iter_value(&fd_iter);
-                                if (v) self.fd_config->cnf_port_tls = atoi(v);
+                                if (v) self.diam_config->cnf_port_tls = atoi(v);
                             } else if (!strcmp(fd_key, "listen_on")) {
-                                self.fd_config->cnf_addr = 
+                                self.diam_config->cnf_addr = 
                                     ogs_yaml_iter_value(&fd_iter);
                             } else if (!strcmp(fd_key, "load_extension")) {
                                 ogs_yaml_iter_t ext_array, ext_iter;
@@ -340,13 +332,13 @@ int mme_context_parse_config()
                                     }
 
                                     if (module) {
-                                        self.fd_config->
-                                            ext[self.fd_config->num_of_ext].
+                                        self.diam_config->
+                                            ext[self.diam_config->num_of_ext].
                                                 module = module;
-                                        self.fd_config->
-                                            ext[self.fd_config->num_of_ext].
+                                        self.diam_config->
+                                            ext[self.diam_config->num_of_ext].
                                                 conf = conf;
-                                        self.fd_config->num_of_ext++;
+                                        self.diam_config->num_of_ext++;
                                     }
                                 } while (ogs_yaml_iter_type(&ext_array) ==
                                         YAML_SEQUENCE_NODE);
@@ -393,16 +385,16 @@ int mme_context_parse_config()
                                     }
 
                                     if (identity && addr) {
-                                        self.fd_config->
-                                            conn[self.fd_config->num_of_conn].
+                                        self.diam_config->
+                                            conn[self.diam_config->num_of_conn].
                                                 identity = identity;
-                                        self.fd_config->
-                                            conn[self.fd_config->num_of_conn].
+                                        self.diam_config->
+                                            conn[self.diam_config->num_of_conn].
                                                 addr = addr;
-                                        self.fd_config->
-                                            conn[self.fd_config->num_of_conn].
+                                        self.diam_config->
+                                            conn[self.diam_config->num_of_conn].
                                                 port = port;
-                                        self.fd_config->num_of_conn++;
+                                        self.diam_config->num_of_conn++;
                                     }
                                 } while (ogs_yaml_iter_type(&conn_array) ==
                                         YAML_SEQUENCE_NODE);
@@ -419,7 +411,7 @@ int mme_context_parse_config()
                     do {
                         int family = AF_UNSPEC;
                         int i, num = 0;
-                        const char *hostname[MAX_NUM_OF_HOSTNAME];
+                        const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
                         uint16_t port = self.s1ap_port;
                         const char *dev = NULL;
                         ogs_sockaddr_t *addr = NULL;
@@ -467,7 +459,7 @@ int mme_context_parse_config()
                                             break;
                                     }
 
-                                    ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
+                                    ogs_assert(num <= OGS_MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
 
@@ -498,7 +490,7 @@ int mme_context_parse_config()
                         }
 
                         if (addr) {
-                            if (context_self()->config.parameter.no_ipv4 == 0) {
+                            if (ogs_config()->parameter.no_ipv4 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -506,7 +498,7 @@ int mme_context_parse_config()
                                         &self.s1ap_list, AF_INET, dup);
                             }
 
-                            if (context_self()->config.parameter.no_ipv6 == 0) {
+                            if (ogs_config()->parameter.no_ipv6 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -519,9 +511,9 @@ int mme_context_parse_config()
 
                         if (dev) {
                             rv = ogs_socknode_probe(
-                                    context_self()->config.parameter.no_ipv4 ?
+                                    ogs_config()->parameter.no_ipv4 ?
                                         NULL : &self.s1ap_list,
-                                    context_self()->config.parameter.no_ipv6 ?
+                                    ogs_config()->parameter.no_ipv6 ?
                                         NULL : &self.s1ap_list6,
                                     dev, self.s1ap_port);
                             ogs_assert(rv == OGS_OK);
@@ -533,9 +525,9 @@ int mme_context_parse_config()
                     if (ogs_list_first(&self.s1ap_list) == NULL &&
                         ogs_list_first(&self.s1ap_list6) == NULL) {
                         rv = ogs_socknode_probe(
-                                context_self()->config.parameter.no_ipv4 ?
+                                ogs_config()->parameter.no_ipv4 ?
                                     NULL : &self.s1ap_list,
-                                context_self()->config.parameter.no_ipv6 ?
+                                ogs_config()->parameter.no_ipv6 ?
                                     NULL : &self.s1ap_list6,
                                 NULL, self.s1ap_port);
                         ogs_assert(rv == OGS_OK);
@@ -546,7 +538,7 @@ int mme_context_parse_config()
                     do {
                         int family = AF_UNSPEC;
                         int i, num = 0;
-                        const char *hostname[MAX_NUM_OF_HOSTNAME];
+                        const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
                         uint16_t port = self.gtpc_port;
                         const char *dev = NULL;
                         ogs_sockaddr_t *addr = NULL;
@@ -595,7 +587,7 @@ int mme_context_parse_config()
                                             break;
                                     }
 
-                                    ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
+                                    ogs_assert(num <= OGS_MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
 
@@ -626,7 +618,7 @@ int mme_context_parse_config()
                         }
 
                         if (addr) {
-                            if (context_self()->config.parameter.no_ipv4 == 0) {
+                            if (ogs_config()->parameter.no_ipv4 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -634,7 +626,7 @@ int mme_context_parse_config()
                                         &self.gtpc_list, AF_INET, dup);
                             }
 
-                            if (context_self()->config.parameter.no_ipv6 == 0) {
+                            if (ogs_config()->parameter.no_ipv6 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -647,9 +639,9 @@ int mme_context_parse_config()
 
                         if (dev) {
                             rv = ogs_socknode_probe(
-                                    context_self()->config.parameter.no_ipv4 ?
+                                    ogs_config()->parameter.no_ipv4 ?
                                         NULL : &self.gtpc_list,
-                                    context_self()->config.parameter.no_ipv6 ?
+                                    ogs_config()->parameter.no_ipv6 ?
                                         NULL : &self.gtpc_list6,
                                     dev, self.gtpc_port);
                             ogs_assert(rv == OGS_OK);
@@ -660,9 +652,9 @@ int mme_context_parse_config()
                     if (ogs_list_first(&self.gtpc_list) == NULL &&
                         ogs_list_first(&self.gtpc_list6) == NULL) {
                         rv = ogs_socknode_probe(
-                                context_self()->config.parameter.no_ipv4 ?
+                                ogs_config()->parameter.no_ipv4 ?
                                     NULL : &self.gtpc_list,
-                                context_self()->config.parameter.no_ipv6 ?
+                                ogs_config()->parameter.no_ipv6 ?
                                     NULL : &self.gtpc_list6,
                                 NULL, self.gtpc_port);
                         ogs_assert(rv == OGS_OK);
@@ -703,7 +695,7 @@ int mme_context_parse_config()
                                 ogs_yaml_iter_recurse(&gummei_iter,
                                         &plmn_id_array);
                                 do {
-                                    plmn_id_t *plmn_id = NULL;
+                                    ogs_plmn_id_t *plmn_id = NULL;
                                     const char *mcc = NULL, *mnc = NULL;
                                     ogs_assert(gummei->num_of_plmn_id <=
                                             MAX_PLMN_ID);
@@ -743,7 +735,7 @@ int mme_context_parse_config()
                                     }
 
                                     if (mcc && mnc) {
-                                        plmn_id_build(plmn_id,
+                                        ogs_plmn_id_build(plmn_id,
                                             atoi(mcc), atoi(mnc), strlen(mnc));
                                         gummei->num_of_plmn_id++;
                                     }
@@ -845,7 +837,7 @@ int mme_context_parse_config()
                     ogs_yaml_iter_recurse(&mme_iter, &tai_array);
                     do {
                         const char *mcc = NULL, *mnc = NULL;
-                        uint16_t tac[MAX_NUM_OF_TAI];
+                        uint16_t tac[OGS_MAX_NUM_OF_TAI];
                         int num_of_tac = 0;
 
                         if (ogs_yaml_iter_type(&tai_array) ==
@@ -893,7 +885,7 @@ int mme_context_parse_config()
                                     const char *v = NULL;
 
                                     ogs_assert(num_of_tac <=
-                                            MAX_NUM_OF_TAI);
+                                            OGS_MAX_NUM_OF_TAI);
                                     if (ogs_yaml_iter_type(&tac_iter) ==
                                             YAML_SEQUENCE_NODE) {
                                         if (!ogs_yaml_iter_next(&tac_iter))
@@ -914,7 +906,7 @@ int mme_context_parse_config()
 
                         if (mcc && mnc && num_of_tac) {
                             if (num_of_tac == 1) {
-                                plmn_id_build(
+                                ogs_plmn_id_build(
                                     &list2->tai[list2->num].plmn_id,
                                     atoi(mcc), atoi(mnc), strlen(mnc));
                                 list2->tai[list2->num].tac = tac[0];
@@ -926,7 +918,7 @@ int mme_context_parse_config()
                                     list2->type = TAI1_TYPE;
                             } else if (num_of_tac > 1) {
                                 int i;
-                                plmn_id_build(
+                                ogs_plmn_id_build(
                                     &list0->tai[num_of_list0].plmn_id,
                                     atoi(mcc), atoi(mnc), strlen(mnc));
                                 for (i = 0; i < num_of_tac; i++) {
@@ -977,19 +969,19 @@ int mme_context_parse_config()
                                         self.num_of_integrity_order;
                                     if (strcmp(v, "EIA0") == 0) {
                                         self.integrity_order[integrity_index] = 
-                                            NAS_SECURITY_ALGORITHMS_EIA0;
+                                            OGS_NAS_SECURITY_ALGORITHMS_EIA0;
                                         self.num_of_integrity_order++;
                                     } else if (strcmp(v, "EIA1") == 0) {
                                         self.integrity_order[integrity_index] = 
-                                            NAS_SECURITY_ALGORITHMS_128_EIA1;
+                                            OGS_NAS_SECURITY_ALGORITHMS_128_EIA1;
                                         self.num_of_integrity_order++;
                                     } else if (strcmp(v, "EIA2") == 0) {
                                         self.integrity_order[integrity_index] = 
-                                            NAS_SECURITY_ALGORITHMS_128_EIA2;
+                                            OGS_NAS_SECURITY_ALGORITHMS_128_EIA2;
                                         self.num_of_integrity_order++;
                                     } else if (strcmp(v, "EIA3") == 0) {
                                         self.integrity_order[integrity_index] = 
-                                            NAS_SECURITY_ALGORITHMS_128_EIA3;
+                                            OGS_NAS_SECURITY_ALGORITHMS_128_EIA3;
                                         self.num_of_integrity_order++;
                                     }
                                 }
@@ -1018,19 +1010,19 @@ int mme_context_parse_config()
                                         self.num_of_ciphering_order;
                                     if (strcmp(v, "EEA0") == 0) {
                                         self.ciphering_order[ciphering_index] = 
-                                            NAS_SECURITY_ALGORITHMS_EEA0;
+                                            OGS_NAS_SECURITY_ALGORITHMS_EEA0;
                                         self.num_of_ciphering_order++;
                                     } else if (strcmp(v, "EEA1") == 0) {
                                         self.ciphering_order[ciphering_index] = 
-                                            NAS_SECURITY_ALGORITHMS_128_EEA1;
+                                            OGS_NAS_SECURITY_ALGORITHMS_128_EEA1;
                                         self.num_of_ciphering_order++;
                                     } else if (strcmp(v, "EEA2") == 0) {
                                         self.ciphering_order[ciphering_index] = 
-                                            NAS_SECURITY_ALGORITHMS_128_EEA2;
+                                            OGS_NAS_SECURITY_ALGORITHMS_128_EEA2;
                                         self.num_of_ciphering_order++;
                                     } else if (strcmp(v, "EEA3") == 0) {
                                         self.ciphering_order[ciphering_index] = 
-                                            NAS_SECURITY_ALGORITHMS_128_EEA3;
+                                            OGS_NAS_SECURITY_ALGORITHMS_128_EEA3;
                                         self.num_of_ciphering_order++;
                                     }
                                 }
@@ -1048,7 +1040,7 @@ int mme_context_parse_config()
                         ogs_yaml_iter_key(&network_name_iter);
                         ogs_assert(network_name_key);
                         if (!strcmp(network_name_key, "full")) {  
-                            nas_network_name_t *network_full_name =
+                            ogs_nas_network_name_t *network_full_name =
                                 &self.full_name;
                             const char *c_network_name = ogs_yaml_iter_value(&network_name_iter);
 
@@ -1068,7 +1060,7 @@ int mme_context_parse_config()
                             network_full_name->length = size*2+1;
                             network_full_name->coding_scheme = 1;
                         } else if (!strcmp(network_name_key, "short")) {
-                            nas_network_name_t *network_short_name =
+                            ogs_nas_network_name_t *network_short_name =
                                 &self.short_name;
                             const char *c_network_name =
                                 ogs_yaml_iter_value(&network_name_iter);
@@ -1095,7 +1087,7 @@ int mme_context_parse_config()
                     ogs_yaml_iter_recurse(&mme_iter, &sgsap_array);
                     do {
                         mme_vlr_t *vlr = NULL;
-                        plmn_id_t plmn_id;
+                        ogs_plmn_id_t plmn_id;
 #define MAX_NUM_OF_CSMAP            128 /* Num of TAI-LAI MAP per MME */
                         struct {
                             const char *tai_mcc, *tai_mnc;
@@ -1106,7 +1098,7 @@ int mme_context_parse_config()
                         ogs_sockaddr_t *addr = NULL;
                         int family = AF_UNSPEC;
                         int i, hostname_num = 0;
-                        const char *hostname[MAX_NUM_OF_HOSTNAME];
+                        const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
                         uint16_t port = self.sgsap_port;
 
                         if (ogs_yaml_iter_type(&sgsap_array) ==
@@ -1155,7 +1147,7 @@ int mme_context_parse_config()
                                     }
 
                                     ogs_assert(hostname_num <=
-                                            MAX_NUM_OF_HOSTNAME);
+                                            OGS_MAX_NUM_OF_HOSTNAME);
                                     hostname[hostname_num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
                                 } while (
@@ -1362,9 +1354,9 @@ int mme_context_parse_config()
                         }
 
                         ogs_filter_ip_version(&addr,
-                                context_self()->config.parameter.no_ipv4,
-                                context_self()->config.parameter.no_ipv6,
-                                context_self()->config.parameter.prefer_ipv4);
+                                ogs_config()->parameter.no_ipv4,
+                                ogs_config()->parameter.no_ipv6,
+                                ogs_config()->parameter.prefer_ipv4);
 
                         vlr = mme_vlr_add(addr);
                         ogs_assert(vlr);
@@ -1373,13 +1365,13 @@ int mme_context_parse_config()
                             mme_csmap_t *csmap = mme_csmap_add(vlr);
                             ogs_assert(csmap);
 
-                            plmn_id_build(&plmn_id, atoi(map[i].tai_mcc),
+                            ogs_plmn_id_build(&plmn_id, atoi(map[i].tai_mcc),
                                 atoi(map[i].tai_mnc), strlen(map[i].tai_mnc));
-                            nas_from_plmn_id(&csmap->tai.nas_plmn_id, &plmn_id);
+                            ogs_nas_from_plmn_id(&csmap->tai.nas_plmn_id, &plmn_id);
                             csmap->tai.tac = atoi(map[i].tac);
-                            plmn_id_build(&plmn_id, atoi(map[i].lai_mcc),
+                            ogs_plmn_id_build(&plmn_id, atoi(map[i].lai_mcc),
                                 atoi(map[i].lai_mnc), strlen(map[i].lai_mnc));
-                            nas_from_plmn_id(&csmap->lai.nas_plmn_id, &plmn_id);
+                            ogs_nas_from_plmn_id(&csmap->lai.nas_plmn_id, &plmn_id);
                             csmap->lai.lac = atoi(map[i].lac);
                         }
                     } while (ogs_yaml_iter_type(&sgsap_array) ==
@@ -1401,9 +1393,9 @@ int mme_context_parse_config()
                         ogs_sockaddr_t *addr = NULL;
                         int family = AF_UNSPEC;
                         int i, num = 0;
-                        const char *hostname[MAX_NUM_OF_HOSTNAME];
+                        const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
                         uint16_t port = self.gtpc_port;
-                        uint16_t tac[MAX_NUM_OF_TAI] = {0,};
+                        uint16_t tac[OGS_MAX_NUM_OF_TAI] = {0,};
                         uint8_t num_of_tac = 0;
 
                         if (ogs_yaml_iter_type(&gtpc_array) ==
@@ -1450,7 +1442,7 @@ int mme_context_parse_config()
                                             break;
                                     }
 
-                                    ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
+                                    ogs_assert(num <= OGS_MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
 
@@ -1475,7 +1467,7 @@ int mme_context_parse_config()
                                     const char *v = NULL;
 
                                     ogs_assert(num_of_tac <=
-                                            MAX_NUM_OF_TAI);
+                                            OGS_MAX_NUM_OF_TAI);
                                     if (ogs_yaml_iter_type(&tac_iter) ==
                                             YAML_SEQUENCE_NODE) {
                                         if (!ogs_yaml_iter_next(&tac_iter))
@@ -1502,9 +1494,9 @@ int mme_context_parse_config()
                         }
 
                         ogs_filter_ip_version(&addr,
-                                context_self()->config.parameter.no_ipv4,
-                                context_self()->config.parameter.no_ipv6,
-                                context_self()->config.parameter.prefer_ipv4);
+                                ogs_config()->parameter.no_ipv4,
+                                ogs_config()->parameter.no_ipv6,
+                                ogs_config()->parameter.prefer_ipv4);
 
                         sgw = mme_sgw_add(addr);
                         ogs_assert(sgw);
@@ -1542,7 +1534,7 @@ int mme_context_parse_config()
                         ogs_sockaddr_t *addr = NULL;
                         int family = AF_UNSPEC;
                         int i, num = 0;
-                        const char *hostname[MAX_NUM_OF_HOSTNAME];
+                        const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
                         const char *apn = NULL;
                         uint16_t port = self.gtpc_port;
 
@@ -1578,7 +1570,8 @@ int mme_context_parse_config()
                             } else if (!strcmp(gtpc_key, "addr") ||
                                     !strcmp(gtpc_key, "name")) {
                                 ogs_yaml_iter_t hostname_iter;
-                                ogs_yaml_iter_recurse(&gtpc_iter, &hostname_iter);
+                                ogs_yaml_iter_recurse(
+                                        &gtpc_iter, &hostname_iter);
                                 ogs_assert(ogs_yaml_iter_type(&hostname_iter) !=
                                     YAML_MAPPING_NODE);
 
@@ -1589,7 +1582,7 @@ int mme_context_parse_config()
                                             break;
                                     }
 
-                                    ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
+                                    ogs_assert(num <= OGS_MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
                                 } while (
@@ -1612,9 +1605,9 @@ int mme_context_parse_config()
                         }
 
                         ogs_filter_ip_version(&addr,
-                                context_self()->config.parameter.no_ipv4,
-                                context_self()->config.parameter.no_ipv6,
-                                context_self()->config.parameter.prefer_ipv4);
+                                ogs_config()->parameter.no_ipv4,
+                                ogs_config()->parameter.no_ipv6,
+                                ogs_config()->parameter.prefer_ipv4);
 
                         pgw = mme_pgw_add(addr);
                         ogs_assert(pgw);
@@ -1644,7 +1637,7 @@ mme_sgw_t *mme_sgw_add(ogs_sockaddr_t *addr)
     ogs_assert(sgw);
     memset(sgw, 0, sizeof *sgw);
 
-    sgw->node = gtp_node_new(addr);
+    sgw->node = ogs_gtp_node_new(addr);
     ogs_assert(sgw->node);
 
     ogs_list_add(&self.sgw_list, sgw);
@@ -1658,7 +1651,7 @@ void mme_sgw_remove(mme_sgw_t *sgw)
 
     ogs_list_remove(&self.sgw_list, sgw);
 
-    gtp_node_free(sgw->node);
+    ogs_gtp_node_free(sgw->node);
     ogs_pool_free(&mme_sgw_pool, sgw);
 }
 
@@ -1678,8 +1671,9 @@ mme_pgw_t *mme_pgw_add(ogs_sockaddr_t *addr)
 
     ogs_pool_alloc(&mme_pgw_pool, &pgw);
     ogs_assert(pgw);
+    memset(pgw, 0, sizeof *pgw);
 
-    pgw->node = gtp_node_new(addr);
+    pgw->node = ogs_gtp_node_new(addr);
     ogs_assert(pgw->node);
 
     ogs_list_add(&self.pgw_list, pgw);
@@ -1693,7 +1687,7 @@ void mme_pgw_remove(mme_pgw_t *pgw)
 
     ogs_list_remove(&self.pgw_list, pgw);
 
-    gtp_node_free(pgw->node);
+    ogs_gtp_node_free(pgw->node);
     ogs_pool_free(&mme_pgw_pool, pgw);
 }
 
@@ -1839,23 +1833,23 @@ void mme_csmap_remove_all(void)
         mme_csmap_remove(csmap);
 }
 
-mme_csmap_t *mme_csmap_find_by_tai(tai_t *tai)
+mme_csmap_t *mme_csmap_find_by_tai(ogs_tai_t *tai)
 {
     mme_csmap_t *csmap = NULL;
     ogs_assert(tai);
 
     ogs_list_for_each(&self.csmap_list, csmap) {
-        nas_tai_t nas_tai;
-        nas_from_plmn_id(&nas_tai.nas_plmn_id, &tai->plmn_id);
-        nas_tai.tac = tai->tac;
-        if (memcmp(&csmap->tai, &nas_tai, sizeof(nas_tai_t)) == 0)
+        ogs_nas_tai_t ogs_nas_tai;
+        ogs_nas_from_plmn_id(&ogs_nas_tai.nas_plmn_id, &tai->plmn_id);
+        ogs_nas_tai.tac = tai->tac;
+        if (memcmp(&csmap->tai, &ogs_nas_tai, sizeof(ogs_nas_tai_t)) == 0)
             return csmap;
     }
 
     return NULL;
 }
 
-mme_csmap_t *mme_csmap_find_by_nas_lai(nas_lai_t *lai)
+mme_csmap_t *mme_csmap_find_by_nas_lai(ogs_nas_lai_t *lai)
 {
     mme_csmap_t *csmap = NULL;
     ogs_assert(lai);
@@ -1878,6 +1872,7 @@ mme_enb_t *mme_enb_add(ogs_sock_t *sock, ogs_sockaddr_t *addr)
 
     ogs_pool_alloc(&mme_enb_pool, &enb);
     ogs_assert(enb);
+    memset(enb, 0, sizeof *enb);
 
     enb->sock = sock;
     enb->addr = addr;
@@ -1885,9 +1880,9 @@ mme_enb_t *mme_enb_add(ogs_sock_t *sock, ogs_sockaddr_t *addr)
 
     enb->max_num_of_ostreams = DEFAULT_SCTP_MAX_NUM_OF_OSTREAMS;
     enb->ostream_id = 0;
-    if (context_self()->config.sockopt.sctp.max_num_of_ostreams) {
+    if (ogs_config()->sockopt.sctp.max_num_of_ostreams) {
         enb->max_num_of_ostreams =
-            context_self()->config.sockopt.sctp.max_num_of_ostreams;
+            ogs_config()->sockopt.sctp.max_num_of_ostreams;
         ogs_info("[ENB] max_num_of_ostreams : %d", enb->max_num_of_ostreams);
     }
 
@@ -1902,6 +1897,7 @@ mme_enb_t *mme_enb_add(ogs_sock_t *sock, ogs_sockaddr_t *addr)
     ogs_hash_set(self.enb_addr_hash, enb->addr, sizeof(ogs_sockaddr_t), enb);
 
     e.enb = enb;
+    e.id = 0;
     ogs_fsm_create(&enb->sm, s1ap_state_initial, s1ap_state_final);
     ogs_fsm_init(&enb->sm, &e);
 
@@ -1999,18 +1995,19 @@ enb_ue_t *enb_ue_add(mme_enb_t *enb)
 
     ogs_pool_alloc(&enb_ue_pool, &enb_ue);
     ogs_assert(enb_ue);
+    memset(enb_ue, 0, sizeof *enb_ue);
 
     enb_ue->enb_ue_s1ap_id = INVALID_UE_S1AP_ID;
-    enb_ue->mme_ue_s1ap_id = NEXT_ID(self.mme_ue_s1ap_id, 1, 0xffffffff);
+    enb_ue->mme_ue_s1ap_id = OGS_NEXT_ID(self.mme_ue_s1ap_id, 1, 0xffffffff);
 
     /*
      * SCTP output stream identification
-     * Default context_self()->config.parameter.sctp_streams : 30
+     * Default ogs_config()->parameter.sctp_streams : 30
      *   0 : Non UE signalling
      *   1-29 : UE specific association 
      */
     enb_ue->enb_ostream_id = 
-        NEXT_ID(enb->ostream_id, 1, enb->max_num_of_ostreams-1);
+        OGS_NEXT_ID(enb->ostream_id, 1, enb->max_num_of_ostreams-1);
 
     enb_ue->enb = enb;
 
@@ -2129,21 +2126,21 @@ static int mme_ue_new_guti(mme_ue_t *mme_ue)
         /* MME has a VALID GUTI
          * As such, we need to remove previous GUTI in hash table */
         ogs_hash_set(self.guti_ue_hash,
-                &mme_ue->guti, sizeof(nas_guti_t), NULL);
+                &mme_ue->guti, sizeof(ogs_nas_guti_t), NULL);
         ogs_assert(mme_m_tmsi_free(mme_ue->m_tmsi) == OGS_OK);
     }
 
-    memset(&mme_ue->guti, 0, sizeof(nas_guti_t));
+    memset(&mme_ue->guti, 0, sizeof(ogs_nas_guti_t));
 
     /* Use the first configured plmn_id and mme group id */
-    nas_from_plmn_id(&mme_ue->guti.nas_plmn_id, &served_gummei->plmn_id[0]);
+    ogs_nas_from_plmn_id(&mme_ue->guti.nas_plmn_id, &served_gummei->plmn_id[0]);
     mme_ue->guti.mme_gid = served_gummei->mme_gid[0];
     mme_ue->guti.mme_code = served_gummei->mme_code[0];
 
     mme_ue->m_tmsi = mme_m_tmsi_alloc();
     ogs_assert(mme_ue->m_tmsi);
     mme_ue->guti.m_tmsi = *(mme_ue->m_tmsi);
-    ogs_hash_set(self.guti_ue_hash, &mme_ue->guti, sizeof(nas_guti_t), mme_ue);
+    ogs_hash_set(self.guti_ue_hash, &mme_ue->guti, sizeof(ogs_nas_guti_t), mme_ue);
 
     return OGS_OK;
 }
@@ -2160,12 +2157,13 @@ mme_ue_t *mme_ue_add(enb_ue_t *enb_ue)
 
     ogs_pool_alloc(&mme_ue_pool, &mme_ue);
     ogs_assert(mme_ue);
+    memset(mme_ue, 0, sizeof *mme_ue);
 
     ogs_list_init(&mme_ue->sess_list);
 
     mme_ue->mme_s11_teid = ogs_pool_index(&mme_ue_pool, mme_ue);
     ogs_assert(mme_ue->mme_s11_teid > 0 &&
-            mme_ue->mme_s11_teid <= context_self()->pool.ue);
+            mme_ue->mme_s11_teid <= ogs_config()->pool.ue);
 
     /* Create New GUTI */
     mme_ue_new_guti(mme_ue);
@@ -2176,7 +2174,7 @@ mme_ue_t *mme_ue_add(enb_ue_t *enb_ue)
             mme_self()->sgw = ogs_list_first(&mme_self()->sgw_list);
 
         ogs_assert(mme_self()->sgw);
-        SETUP_GTP_NODE(mme_ue, mme_self()->sgw->node);
+        OGS_SETUP_GTP_NODE(mme_ue, mme_self()->sgw->node);
 
         mme_self()->sgw = ogs_list_next(mme_self()->sgw);
     } else if (mme_self()->sgw_selection == SGW_SELECT_TAC) {
@@ -2193,7 +2191,7 @@ mme_ue_t *mme_ue_add(enb_ue_t *enb_ue)
         }
 
         ogs_assert(mme_self()->sgw);
-        SETUP_GTP_NODE(mme_ue, mme_self()->sgw->node);
+        OGS_SETUP_GTP_NODE(mme_ue, mme_self()->sgw->node);
     } else
         ogs_assert_if_reached();
         
@@ -2204,17 +2202,23 @@ mme_ue_t *mme_ue_add(enb_ue_t *enb_ue)
     /* Add All Timers */
     mme_ue->t3413.timer = ogs_timer_add(
             self.timer_mgr, mme_timer_t3413_expire, mme_ue);
+    mme_ue->t3413.pkbuf = NULL;
     mme_ue->t3422.timer = ogs_timer_add(
             self.timer_mgr, mme_timer_t3422_expire, mme_ue);
+    mme_ue->t3422.pkbuf = NULL;
     mme_ue->t3450.timer = ogs_timer_add(
             self.timer_mgr, mme_timer_t3450_expire, mme_ue);
+    mme_ue->t3450.pkbuf = NULL;
     mme_ue->t3460.timer = ogs_timer_add(
             self.timer_mgr, mme_timer_t3460_expire, mme_ue);
+    mme_ue->t3460.pkbuf = NULL;
     mme_ue->t3470.timer = ogs_timer_add(
             self.timer_mgr, mme_timer_t3470_expire, mme_ue);
+    mme_ue->t3470.pkbuf = NULL;
 
     /* Create FSM */
     e.mme_ue = mme_ue;
+    e.id = 0;
     ogs_fsm_create(&mme_ue->sm, emm_state_initial, emm_state_final);
     ogs_fsm_init(&mme_ue->sm, &e);
 
@@ -2238,23 +2242,23 @@ void mme_ue_remove(mme_ue_t *mme_ue)
     /* Clear hash table */
     if (mme_ue->m_tmsi) {
         ogs_hash_set(self.guti_ue_hash,
-                &mme_ue->guti, sizeof(nas_guti_t), NULL);
+                &mme_ue->guti, sizeof(ogs_nas_guti_t), NULL);
         ogs_assert(mme_m_tmsi_free(mme_ue->m_tmsi) == OGS_OK);
     }
     if (mme_ue->imsi_len != 0)
         ogs_hash_set(self.imsi_ue_hash, mme_ue->imsi, mme_ue->imsi_len, NULL);
     
     /* Clear the saved PDN Connectivity Request */
-    NAS_CLEAR_DATA(&mme_ue->pdn_connectivity_request);
+    OGS_NAS_CLEAR_DATA(&mme_ue->pdn_connectivity_request);
 
     /* Clear Service Indicator */
     CLEAR_SERVICE_INDICATOR(mme_ue);
 
     /* Free UeRadioCapability */
-    S1AP_CLEAR_DATA(&mme_ue->ueRadioCapability);
+    OGS_S1AP_CLEAR_DATA(&mme_ue->ueRadioCapability);
 
     /* Clear Transparent Container */
-    S1AP_CLEAR_DATA(&mme_ue->container);
+    OGS_S1AP_CLEAR_DATA(&mme_ue->container);
 
     /* Delete All Timers */
     CLEAR_MME_UE_ALL_TIMERS(mme_ue);
@@ -2282,7 +2286,7 @@ void mme_ue_remove_all()
 
 mme_ue_t *mme_ue_find_by_imsi_bcd(char *imsi_bcd)
 {
-    uint8_t imsi[MAX_IMSI_LEN];
+    uint8_t imsi[OGS_MAX_IMSI_LEN];
     int imsi_len = 0;
 
     ogs_assert(imsi_bcd);
@@ -2299,12 +2303,12 @@ mme_ue_t *mme_ue_find_by_imsi(uint8_t *imsi, int imsi_len)
     return (mme_ue_t *)ogs_hash_get(self.imsi_ue_hash, imsi, imsi_len);
 }
 
-mme_ue_t *mme_ue_find_by_guti(nas_guti_t *guti)
+mme_ue_t *mme_ue_find_by_guti(ogs_nas_guti_t *guti)
 {
     ogs_assert(guti);
 
     return (mme_ue_t *)ogs_hash_get(
-            self.guti_ue_hash, guti, sizeof(nas_guti_t));
+            self.guti_ue_hash, guti, sizeof(ogs_nas_guti_t));
 }
 
 mme_ue_t *mme_ue_find_by_teid(uint32_t teid)
@@ -2312,29 +2316,29 @@ mme_ue_t *mme_ue_find_by_teid(uint32_t teid)
     return ogs_pool_find(&mme_ue_pool, teid);
 }
 
-mme_ue_t *mme_ue_find_by_message(nas_message_t *message)
+mme_ue_t *mme_ue_find_by_message(ogs_nas_message_t *message)
 {
     mme_ue_t *mme_ue = NULL;
-    nas_attach_request_t *attach_request = NULL;
-    nas_tracking_area_update_request_t *tau_request = NULL;
-    nas_extended_service_request_t *extended_service_request = NULL;
-    nas_eps_mobile_identity_t *eps_mobile_identity = NULL;
-    nas_mobile_identity_t *mobile_identity = NULL;
+    ogs_nas_attach_request_t *attach_request = NULL;
+    ogs_nas_tracking_area_update_request_t *tau_request = NULL;
+    ogs_nas_extended_service_request_t *extended_service_request = NULL;
+    ogs_nas_eps_mobile_identity_t *eps_mobile_identity = NULL;
+    ogs_nas_mobile_identity_t *mobile_identity = NULL;
 
-    char imsi_bcd[MAX_IMSI_BCD_LEN+1];
-    nas_eps_mobile_identity_guti_t *eps_mobile_identity_guti = NULL;
-    nas_mobile_identity_tmsi_t *mobile_identity_tmsi = NULL;
+    char imsi_bcd[OGS_MAX_IMSI_BCD_LEN+1];
+    ogs_nas_eps_mobile_identity_guti_t *eps_mobile_identity_guti = NULL;
+    ogs_nas_mobile_identity_tmsi_t *mobile_identity_tmsi = NULL;
     served_gummei_t *served_gummei = NULL;
-    nas_guti_t nas_guti;
+    ogs_nas_guti_t ogs_nas_guti;
 
     switch (message->emm.h.message_type) {
-    case NAS_ATTACH_REQUEST:
+    case OGS_NAS_ATTACH_REQUEST:
         attach_request = &message->emm.attach_request;
         eps_mobile_identity = &attach_request->eps_mobile_identity;
 
         switch(eps_mobile_identity->imsi.type) {
-        case NAS_EPS_MOBILE_IDENTITY_IMSI:
-            nas_imsi_to_bcd(
+        case OGS_NAS_EPS_MOBILE_IDENTITY_IMSI:
+            ogs_nas_imsi_to_bcd(
                 &eps_mobile_identity->imsi, eps_mobile_identity->length,
                 imsi_bcd);
 
@@ -2345,25 +2349,25 @@ mme_ue_t *mme_ue_find_by_message(nas_message_t *message)
                 ogs_trace("Unknown UE by IMSI[%s]", imsi_bcd);
             }
             break;
-        case NAS_EPS_MOBILE_IDENTITY_GUTI:
+        case OGS_NAS_EPS_MOBILE_IDENTITY_GUTI:
             eps_mobile_identity_guti = &eps_mobile_identity->guti;
 
-            nas_guti.nas_plmn_id = eps_mobile_identity_guti->nas_plmn_id;
-            nas_guti.mme_gid = eps_mobile_identity_guti->mme_gid;
-            nas_guti.mme_code = eps_mobile_identity_guti->mme_code;
-            nas_guti.m_tmsi = eps_mobile_identity_guti->m_tmsi;
+            ogs_nas_guti.nas_plmn_id = eps_mobile_identity_guti->nas_plmn_id;
+            ogs_nas_guti.mme_gid = eps_mobile_identity_guti->mme_gid;
+            ogs_nas_guti.mme_code = eps_mobile_identity_guti->mme_code;
+            ogs_nas_guti.m_tmsi = eps_mobile_identity_guti->m_tmsi;
 
-            mme_ue = mme_ue_find_by_guti(&nas_guti);
+            mme_ue = mme_ue_find_by_guti(&ogs_nas_guti);
             if (mme_ue) {
                 ogs_trace("Known UE by GUTI[G:%d,C:%d,M_TMSI:0x%x]",
-                        nas_guti.mme_gid,
-                        nas_guti.mme_code,
-                        nas_guti.m_tmsi);
+                        ogs_nas_guti.mme_gid,
+                        ogs_nas_guti.mme_code,
+                        ogs_nas_guti.m_tmsi);
             } else {
                 ogs_warn("Unknown UE by GUTI[G:%d,C:%d,M_TMSI:0x%x]",
-                        nas_guti.mme_gid,
-                        nas_guti.mme_code,
-                        nas_guti.m_tmsi);
+                        ogs_nas_guti.mme_gid,
+                        ogs_nas_guti.mme_code,
+                        ogs_nas_guti.m_tmsi);
             }
             break;
         default:
@@ -2371,33 +2375,33 @@ mme_ue_t *mme_ue_find_by_message(nas_message_t *message)
             break;
         }
         break;
-    case NAS_DETACH_REQUEST:
+    case OGS_NAS_DETACH_REQUEST:
         /* TODO */
         break;
-    case NAS_TRACKING_AREA_UPDATE_REQUEST:
+    case OGS_NAS_TRACKING_AREA_UPDATE_REQUEST:
         tau_request = &message->emm.tracking_area_update_request;
         eps_mobile_identity = &tau_request->old_guti;
 
         switch(eps_mobile_identity->imsi.type) {
-        case NAS_EPS_MOBILE_IDENTITY_GUTI:
+        case OGS_NAS_EPS_MOBILE_IDENTITY_GUTI:
             eps_mobile_identity_guti = &eps_mobile_identity->guti;
 
-            nas_guti.nas_plmn_id = eps_mobile_identity_guti->nas_plmn_id;
-            nas_guti.mme_gid = eps_mobile_identity_guti->mme_gid;
-            nas_guti.mme_code = eps_mobile_identity_guti->mme_code;
-            nas_guti.m_tmsi = eps_mobile_identity_guti->m_tmsi;
+            ogs_nas_guti.nas_plmn_id = eps_mobile_identity_guti->nas_plmn_id;
+            ogs_nas_guti.mme_gid = eps_mobile_identity_guti->mme_gid;
+            ogs_nas_guti.mme_code = eps_mobile_identity_guti->mme_code;
+            ogs_nas_guti.m_tmsi = eps_mobile_identity_guti->m_tmsi;
 
-            mme_ue = mme_ue_find_by_guti(&nas_guti);
+            mme_ue = mme_ue_find_by_guti(&ogs_nas_guti);
             if (mme_ue) {
                 ogs_trace("Known UE by GUTI[G:%d,C:%d,M_TMSI:0x%x]",
-                        nas_guti.mme_gid,
-                        nas_guti.mme_code,
-                        nas_guti.m_tmsi);
+                        ogs_nas_guti.mme_gid,
+                        ogs_nas_guti.mme_code,
+                        ogs_nas_guti.m_tmsi);
             } else {
                 ogs_warn("Unknown UE by GUTI[G:%d,C:%d,M_TMSI:0x%x]",
-                        nas_guti.mme_gid,
-                        nas_guti.mme_code,
-                        nas_guti.m_tmsi);
+                        ogs_nas_guti.mme_gid,
+                        ogs_nas_guti.mme_code,
+                        ogs_nas_guti.m_tmsi);
             }
             break;
         default:
@@ -2405,32 +2409,32 @@ mme_ue_t *mme_ue_find_by_message(nas_message_t *message)
             break;
         }
         break;
-    case NAS_EXTENDED_SERVICE_REQUEST:
+    case OGS_NAS_EXTENDED_SERVICE_REQUEST:
         extended_service_request = &message->emm.extended_service_request;
         mobile_identity = &extended_service_request->m_tmsi;
 
         switch(mobile_identity->tmsi.type) {
-        case NAS_MOBILE_IDENTITY_TMSI:
+        case OGS_NAS_MOBILE_IDENTITY_TMSI:
             mobile_identity_tmsi = &mobile_identity->tmsi;
             served_gummei = &mme_self()->served_gummei[0];
 
             /* Use the first configured plmn_id and mme group id */
-            nas_from_plmn_id(&nas_guti.nas_plmn_id, &served_gummei->plmn_id[0]);
-            nas_guti.mme_gid = served_gummei->mme_gid[0];
-            nas_guti.mme_code = served_gummei->mme_code[0];
-            nas_guti.m_tmsi = mobile_identity_tmsi->tmsi;
+            ogs_nas_from_plmn_id(&ogs_nas_guti.nas_plmn_id, &served_gummei->plmn_id[0]);
+            ogs_nas_guti.mme_gid = served_gummei->mme_gid[0];
+            ogs_nas_guti.mme_code = served_gummei->mme_code[0];
+            ogs_nas_guti.m_tmsi = mobile_identity_tmsi->tmsi;
 
-            mme_ue = mme_ue_find_by_guti(&nas_guti);
+            mme_ue = mme_ue_find_by_guti(&ogs_nas_guti);
             if (mme_ue) {
                 ogs_trace("Known UE by GUTI[G:%d,C:%d,M_TMSI:0x%x]",
-                        nas_guti.mme_gid,
-                        nas_guti.mme_code,
-                        nas_guti.m_tmsi);
+                        ogs_nas_guti.mme_gid,
+                        ogs_nas_guti.mme_code,
+                        ogs_nas_guti.m_tmsi);
             } else {
                 ogs_warn("Unknown UE by GUTI[G:%d,C:%d,M_TMSI:0x%x]",
-                        nas_guti.mme_gid,
-                        nas_guti.mme_code,
-                        nas_guti.m_tmsi);
+                        ogs_nas_guti.mme_gid,
+                        ogs_nas_guti.mme_code,
+                        ogs_nas_guti.m_tmsi);
             }
             break;
         default:
@@ -2449,7 +2453,7 @@ int mme_ue_set_imsi(mme_ue_t *mme_ue, char *imsi_bcd)
 {
     ogs_assert(mme_ue && imsi_bcd);
 
-    ogs_cpystrn(mme_ue->imsi_bcd, imsi_bcd, MAX_IMSI_BCD_LEN+1);
+    ogs_cpystrn(mme_ue->imsi_bcd, imsi_bcd, OGS_MAX_IMSI_BCD_LEN+1);
     ogs_bcd_to_buffer(mme_ue->imsi_bcd, mme_ue->imsi, &mme_ue->imsi_len);
 
     ogs_hash_set(self.imsi_ue_hash, mme_ue->imsi, mme_ue->imsi_len, mme_ue);
@@ -2569,10 +2573,11 @@ mme_sess_t *mme_sess_add(mme_ue_t *mme_ue, uint8_t pti)
     mme_bearer_t *bearer = NULL;
 
     ogs_assert(mme_ue);
-    ogs_assert(pti != NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED);
+    ogs_assert(pti != OGS_NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED);
 
     ogs_pool_alloc(&mme_sess_pool, &sess);
     ogs_assert(sess);
+    memset(sess, 0, sizeof *sess);
 
     ogs_list_init(&sess->bearer_list);
 
@@ -2596,8 +2601,8 @@ void mme_sess_remove(mme_sess_t *sess)
 
     mme_bearer_remove_all(sess);
 
-    NAS_CLEAR_DATA(&sess->ue_pco);
-    TLV_CLEAR_DATA(&sess->pgw_pco);
+    OGS_NAS_CLEAR_DATA(&sess->ue_pco);
+    OGS_TLV_CLEAR_DATA(&sess->pgw_pco);
 
     ogs_pool_free(&mme_sess_pool, sess);
 }
@@ -2694,8 +2699,10 @@ mme_bearer_t *mme_bearer_add(mme_sess_t *sess)
 
     ogs_pool_alloc(&mme_bearer_pool, &bearer);
     ogs_assert(bearer);
+    memset(bearer, 0, sizeof *bearer);
 
-    bearer->ebi = NEXT_ID(mme_ue->ebi, MIN_EPS_BEARER_ID, MAX_EPS_BEARER_ID);
+    bearer->ebi = OGS_NEXT_ID(mme_ue->ebi,
+            MIN_EPS_BEARER_ID, MAX_EPS_BEARER_ID);
 
     bearer->mme_ue = mme_ue;
     bearer->sess = sess;
@@ -2704,8 +2711,10 @@ mme_bearer_t *mme_bearer_add(mme_sess_t *sess)
 
     bearer->t3489.timer = ogs_timer_add(
             self.timer_mgr, mme_timer_t3489_expire, bearer);
+    bearer->t3489.pkbuf = NULL;
     
     e.bearer = bearer;
+    e.id = 0;
     ogs_fsm_create(&bearer->sm, esm_state_initial, esm_state_final);
     ogs_fsm_init(&bearer->sm, &e);
 
@@ -2728,7 +2737,7 @@ void mme_bearer_remove(mme_bearer_t *bearer)
 
     ogs_list_remove(&bearer->sess->bearer_list, bearer);
 
-    TLV_CLEAR_DATA(&bearer->tft);
+    OGS_TLV_CLEAR_DATA(&bearer->tft);
     
     ogs_pool_free(&mme_bearer_pool, bearer);
 }
@@ -2783,10 +2792,10 @@ mme_bearer_t *mme_bearer_find_by_ue_ebi(mme_ue_t *mme_ue, uint8_t ebi)
 }
 
 mme_bearer_t *mme_bearer_find_or_add_by_message(
-        mme_ue_t *mme_ue, nas_message_t *message)
+        mme_ue_t *mme_ue, ogs_nas_message_t *message)
 {
-    uint8_t pti = NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED;
-    uint8_t ebi = NAS_EPS_BEARER_IDENTITY_UNASSIGNED;
+    uint8_t pti = OGS_NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED;
+    uint8_t ebi = OGS_NAS_EPS_BEARER_IDENTITY_UNASSIGNED;
 
     mme_bearer_t *bearer = NULL;
     mme_sess_t *sess = NULL;
@@ -2800,13 +2809,13 @@ mme_bearer_t *mme_bearer_find_or_add_by_message(
     ogs_debug("mme_bearer_find_or_add_by_message() [PTI:%d, EBI:%d]",
             pti, ebi);
 
-    if (ebi != NAS_EPS_BEARER_IDENTITY_UNASSIGNED) {
+    if (ebi != OGS_NAS_EPS_BEARER_IDENTITY_UNASSIGNED) {
         bearer = mme_bearer_find_by_ue_ebi(mme_ue, ebi);
         ogs_assert(bearer);
         return bearer;
     }
 
-    if (pti == NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED) {
+    if (pti == OGS_NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED) {
         ogs_error("Both PTI[%d] and EBI[%d] are 0", pti, ebi);
         nas_send_attach_reject(mme_ue,
             EMM_CAUSE_SEMANTICALLY_INCORRECT_MESSAGE,
@@ -2814,11 +2823,11 @@ mme_bearer_t *mme_bearer_find_or_add_by_message(
         return NULL;
     }
 
-    if (message->esm.h.message_type == NAS_PDN_CONNECTIVITY_REQUEST) {
-        nas_pdn_connectivity_request_t *pdn_connectivity_request =
+    if (message->esm.h.message_type == OGS_NAS_PDN_CONNECTIVITY_REQUEST) {
+        ogs_nas_pdn_connectivity_request_t *pdn_connectivity_request =
             &message->esm.pdn_connectivity_request;
         if (pdn_connectivity_request->presencemask &
-                NAS_PDN_CONNECTIVITY_REQUEST_ACCESS_POINT_NAME_PRESENT)
+                OGS_NAS_PDN_CONNECTIVITY_REQUEST_ACCESS_POINT_NAME_PRESENT)
             sess = mme_sess_find_by_apn(mme_ue,
                     pdn_connectivity_request->access_point_name.apn);
         else
@@ -2830,10 +2839,10 @@ mme_bearer_t *mme_bearer_find_or_add_by_message(
             sess->pti = pti;
 
         ogs_assert(sess);
-    } else if (message->esm.h.message_type == NAS_PDN_DISCONNECT_REQUEST) {
-        nas_pdn_disconnect_request_t *pdn_disconnect_request = 
+    } else if (message->esm.h.message_type == OGS_NAS_PDN_DISCONNECT_REQUEST) {
+        ogs_nas_pdn_disconnect_request_t *pdn_disconnect_request = 
             &message->esm.pdn_disconnect_request;
-        nas_linked_eps_bearer_identity_t *linked_eps_bearer_identity =
+        ogs_nas_linked_eps_bearer_identity_t *linked_eps_bearer_identity =
             &pdn_disconnect_request->linked_eps_bearer_identity;
 
         bearer = mme_bearer_find_by_ue_ebi(mme_ue,
@@ -2924,7 +2933,7 @@ int mme_bearer_set_inactive(mme_ue_t *mme_ue)
 
 void mme_pdn_remove_all(mme_ue_t *mme_ue)
 {
-    s6a_subscription_data_t *subscription_data = NULL;
+    ogs_diam_s6a_subscription_data_t *subscription_data = NULL;
 
     ogs_assert(mme_ue);
     subscription_data = &mme_ue->subscription_data;
@@ -2933,10 +2942,10 @@ void mme_pdn_remove_all(mme_ue_t *mme_ue)
     subscription_data->num_of_pdn = 0;
 }
 
-pdn_t *mme_pdn_find_by_apn(mme_ue_t *mme_ue, char *apn)
+ogs_pdn_t *mme_pdn_find_by_apn(mme_ue_t *mme_ue, char *apn)
 {
-    s6a_subscription_data_t *subscription_data = NULL;
-    pdn_t *pdn = NULL;
+    ogs_diam_s6a_subscription_data_t *subscription_data = NULL;
+    ogs_pdn_t *pdn = NULL;
     int i = 0;
     
     ogs_assert(mme_ue);
@@ -2952,10 +2961,10 @@ pdn_t *mme_pdn_find_by_apn(mme_ue_t *mme_ue, char *apn)
     return NULL;
 }
 
-pdn_t *mme_default_pdn(mme_ue_t *mme_ue)
+ogs_pdn_t *mme_default_pdn(mme_ue_t *mme_ue)
 {
-    s6a_subscription_data_t *subscription_data = NULL;
-    pdn_t *pdn = NULL;
+    ogs_diam_s6a_subscription_data_t *subscription_data = NULL;
+    ogs_pdn_t *pdn = NULL;
     int i = 0;
     
     ogs_assert(mme_ue);
@@ -2971,7 +2980,7 @@ pdn_t *mme_default_pdn(mme_ue_t *mme_ue)
     return NULL;
 }
 
-int mme_find_served_tai(tai_t *tai)
+int mme_find_served_tai(ogs_tai_t *tai)
 {
     int i = 0, j = 0, k = 0;
 
@@ -2985,11 +2994,11 @@ int mme_find_served_tai(tai_t *tai)
 
         for (j = 0; list0->tai[j].num; j++) {
             ogs_assert(list0->tai[j].type == TAI0_TYPE);
-            ogs_assert(list0->tai[j].num < MAX_NUM_OF_TAI);
+            ogs_assert(list0->tai[j].num < OGS_MAX_NUM_OF_TAI);
 
             for (k = 0; k < list0->tai[j].num; k++) {
                 if (memcmp(&list0->tai[j].plmn_id,
-                            &tai->plmn_id, PLMN_ID_LEN) == 0 && 
+                            &tai->plmn_id, OGS_PLMN_ID_LEN) == 0 && 
                     list0->tai[j].tac[k] == tai->tac) {
                     return i;
                 }
@@ -2998,11 +3007,11 @@ int mme_find_served_tai(tai_t *tai)
 
         if (list2->num) {
             ogs_assert(list2->type == TAI1_TYPE || list2->type == TAI2_TYPE);
-            ogs_assert(list2->num < MAX_NUM_OF_TAI);
+            ogs_assert(list2->num < OGS_MAX_NUM_OF_TAI);
 
             for (j = 0; j < list2->num; j++) {
                 if (memcmp(&list2->tai[j].plmn_id,
-                            &tai->plmn_id, PLMN_ID_LEN) == 0 && 
+                            &tai->plmn_id, OGS_PLMN_ID_LEN) == 0 && 
                     list2->tai[j].tac == tai->tac) {
                     return i;
                 }
@@ -3019,7 +3028,7 @@ int mme_m_tmsi_pool_generate()
     int index = 0;
 
     ogs_trace("M-TMSI Pool try to generate...");
-    for (i = 0; index < context_self()->pool.ue; i++) {
+    for (i = 0; index < ogs_config()->pool.ue; i++) {
         mme_m_tmsi_t *m_tmsi = NULL;
         int conflict = 0;
 

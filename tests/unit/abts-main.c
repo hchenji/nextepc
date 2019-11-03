@@ -17,24 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "ogs-core.h"
-#include "core/abts.h"
-
-#include "mme/ogs-sctp.h"
-
-#include "fd/fd-lib.h"
-
-#include "app/application.h"
-#include "app/context.h"
-
-#include "app-init.h"
-#include "mme/mme-context.h"
+#include "test-app.h"
 
 abts_suite *test_s1ap_message(abts_suite *suite);
 abts_suite *test_nas_message(abts_suite *suite);
 abts_suite *test_gtp_message(abts_suite *suite);
 abts_suite *test_security(abts_suite *suite);
-abts_suite *test_sctp(abts_suite *suite);
 abts_suite *test_crash(abts_suite *suite);
 
 const struct testlist {
@@ -44,108 +32,69 @@ const struct testlist {
     {test_nas_message},
     {test_gtp_message},
     {test_security},
-    {test_sctp},
     {test_crash},
     {NULL},
 };
 
-void test_terminate(void)
+static void terminate(void)
 {
-    app_will_terminate();
     mme_context_final();
-    ogs_sctp_final();
-    app_did_terminate();
 
-    base_finalize();
-    ogs_core_finalize();
+    ogs_pkbuf_default_destroy();
+
+    ogs_core_terminate();
 }
 
-int test_initialize(app_param_t *param, int argc, const char *const argv[])
+int main(int argc, const char *const argv[])
 {
-    int rv;
+    int rv, i, opt;
+    ogs_getopt_t options;
+    struct {
+        char *log_level;
+        char *domain_mask;
+    } optarg;
+    const char *argv_out[argc+2]; /* '-e error' is always added */
+    
+    abts_suite *suite = NULL;
+    ogs_pkbuf_config_t config;
 
-    atexit(test_terminate);
+    rv = abts_main(argc, argv, argv_out);
+    if (rv != OGS_OK) return rv;
+
+    memset(&optarg, 0, sizeof(optarg));
+    ogs_getopt_init(&options, (char**)argv_out);
+
+    while ((opt = ogs_getopt(&options, "e:m:")) != -1) {
+        switch (opt) {
+        case 'e':
+            optarg.log_level = options.optarg;
+            break;
+        case 'm':
+            optarg.domain_mask = options.optarg;
+            break;
+        case '?':
+        default:
+            fprintf(stderr, "%s: should not be reached\n", OGS_FUNC);
+            return OGS_ERROR;
+        }
+    }
 
     ogs_core_initialize();
-    base_initialize();
+    ogs_app_setup_log();
 
-    param->logfile_disabled = true;
-    param->db_disabled = true;
-    rv = app_will_initialize(param);
-    if (rv != OGS_OK) {
-        ogs_error("app_will_initialize() failed");
-        return OGS_ERROR;
-    }
+    ogs_pkbuf_default_init(&config);
+    ogs_pkbuf_default_create(&config);
 
+    ogs_config_init();
     mme_context_init();
-    ogs_sctp_init(context_self()->config.usrsctp.udp_port);
 
-    app_did_initialize();
+    atexit(terminate);
 
-    return rv;
-}
-
-int main(int argc, const char **argv)
-{
-    int i;
-    app_param_t param;
-    const char *debug_mask = NULL;
-    const char *trace_mask = NULL;
-    char config_dir[MAX_FILEPATH_LEN/2];
-    char config_path[MAX_FILEPATH_LEN];
-    abts_suite *suite = NULL;
-
-    abts_init(argc, argv);
-
-    memset(&param, 0, sizeof(param));
-    for (i = 1; i < argc; i++) {
-        /* abts_init(argc, argv) handles the following options */
-        if (!strcmp(argv[i], "-v")) continue;
-        if (!strcmp(argv[i], "-x")) continue;
-        if (!strcmp(argv[i], "-l")) continue;
-        if (!strcmp(argv[i], "-q")) continue;
-
-        if (!strcmp(argv[i], "-d")) {
-            param.log_level = OGS_LOG_DEBUG;
-            param.log_domain = argv[++i];
-            continue;
-        }
-        if (!strcmp(argv[i], "-t")) {
-            param.log_level = OGS_LOG_TRACE;
-            param.log_domain = argv[++i];
-            continue;
-        }
-        if (!strcmp(argv[i], "-f")) {
-            param.config_path = argv[++i];
-            continue;
-        }
-
-        if (argv[i][0] == '-') {
-            fprintf(stderr, "Invalid option: `%s'\n", argv[i]);
-            exit(1);
-        }
-    }
-
-    if (!param.config_path)
-    {
-        ogs_path_remove_last_component(config_dir, argv[0]);
-        if (strstr(config_dir, ".libs"))
-            ogs_path_remove_last_component(config_dir, config_dir);
-        ogs_snprintf(config_path, sizeof config_path,
-                "%s/sample.conf", config_dir);
-        param.config_path = config_path;
-    }
-
-    if (param.log_level)
-        ogs_core()->log.level = OGS_LOG_DEFAULT;
-    else
-        ogs_core()->log.level = OGS_LOG_ERROR;
-    test_initialize(&param, argc, argv);
+    rv = ogs_log_config_domain(optarg.domain_mask, optarg.log_level);
+    if (rv != OGS_OK) return rv;
 
     for (i = 0; alltests[i].func; i++)
-    {
         suite = alltests[i].func(suite);
-    }
 
     return abts_report(suite);
 }

@@ -20,14 +20,12 @@
 #ifndef SGW_GTP_PATH_H
 #define SGW_GTP_PATH_H
 
-#include "gtp/gtp-xact.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int sgw_gtp_open();
-void sgw_gtp_close();
+int sgw_gtp_open(void);
+void sgw_gtp_close(void);
 
 int sgw_gtp_send_end_marker(sgw_tunnel_t *s1u_tunnel);
 

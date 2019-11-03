@@ -1,17 +1,16 @@
 ARG dist=ubuntu
-ARG tag=bionic
+ARG tag=latest
 FROM ${dist}:${tag}
 
 MAINTAINER Sukchan Lee <acetcom@gmail.com>
-MAINTAINER Harsha Chenji <chenji@ohio.edu>
 
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-        autoconf \
-        automake \
-        libtool \
-        gcc \
+        python3-pip \
+        python3-setuptools \
+        ninja-build \
+        build-essential \
         flex \
         bison \
         git \
@@ -23,10 +22,9 @@ RUN apt-get update && \
         libmongoc-dev \
         libbson-dev \
         libyaml-dev \
-        libcurl4-openssl-dev \
-        build-essential \
         iproute2 \
         ca-certificates \
         netbase \
         pkg-config && \
     apt-get clean
+RUN python3 -m pip install meson

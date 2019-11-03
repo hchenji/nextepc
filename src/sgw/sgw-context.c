@@ -17,16 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <mongoc.h>
 #include <yaml.h>
 
-#include "gtp/gtp-types.h"
-#include "gtp/gtp-conv.h"
-#include "gtp/gtp-node.h"
-#include "gtp/gtp-path.h"
-#include "gtp/gtp-xact.h"
-
-#include "app/context.h"
 #include "sgw-context.h"
 
 static sgw_context_t self;
@@ -40,12 +32,13 @@ static OGS_POOL(sgw_tunnel_pool, sgw_tunnel_t);
 
 static int context_initialized = 0;
 
-void sgw_context_init()
+void sgw_context_init(void)
 {
     ogs_assert(context_initialized == 0);
 
     memset(&self, 0, sizeof(sgw_context_t));
 
+    ogs_log_install_domain(&__ogs_gtp_domain, "gtp", ogs_core()->log.level);
     ogs_log_install_domain(&__sgw_log_domain, "sgw", ogs_core()->log.level);
 
     ogs_list_init(&self.gtpc_list);
@@ -53,23 +46,23 @@ void sgw_context_init()
     ogs_list_init(&self.gtpu_list);
     ogs_list_init(&self.gtpu_list6);
 
-    gtp_node_init();
+    ogs_gtp_node_init(512);
     ogs_list_init(&self.mme_s11_list);
     ogs_list_init(&self.pgw_s5c_list);
     ogs_list_init(&self.enb_s1u_list);
     ogs_list_init(&self.pgw_s5u_list);
 
-    ogs_pool_init(&sgw_ue_pool, context_self()->pool.ue);
-    ogs_pool_init(&sgw_sess_pool, context_self()->pool.sess);
-    ogs_pool_init(&sgw_bearer_pool, context_self()->pool.bearer);
-    ogs_pool_init(&sgw_tunnel_pool, context_self()->pool.tunnel);
+    ogs_pool_init(&sgw_ue_pool, ogs_config()->pool.ue);
+    ogs_pool_init(&sgw_sess_pool, ogs_config()->pool.sess);
+    ogs_pool_init(&sgw_bearer_pool, ogs_config()->pool.bearer);
+    ogs_pool_init(&sgw_tunnel_pool, ogs_config()->pool.tunnel);
 
     ogs_list_init(&self.sgw_ue_list);
 
     context_initialized = 1;
 }
 
-void sgw_context_final()
+void sgw_context_final(void)
 {
     ogs_assert(context_initialized == 1);
 
@@ -80,54 +73,52 @@ void sgw_context_final()
     ogs_pool_final(&sgw_sess_pool);
     ogs_pool_final(&sgw_ue_pool);
 
-    gtp_node_remove_all(&self.mme_s11_list);
-    gtp_node_remove_all(&self.pgw_s5c_list);
-    gtp_node_remove_all(&self.enb_s1u_list);
-    gtp_node_remove_all(&self.pgw_s5u_list);
-    gtp_node_final();
+    ogs_gtp_node_remove_all(&self.mme_s11_list);
+    ogs_gtp_node_remove_all(&self.pgw_s5c_list);
+    ogs_gtp_node_remove_all(&self.enb_s1u_list);
+    ogs_gtp_node_remove_all(&self.pgw_s5u_list);
+    ogs_gtp_node_final();
 
     context_initialized = 0;
 }
 
-sgw_context_t *sgw_self()
+sgw_context_t *sgw_self(void)
 {
     return &self;
 }
 
-static int sgw_context_prepare()
+static int sgw_context_prepare(void)
 {
-    self.gtpc_port = GTPV2_C_UDP_PORT;
-    self.gtpu_port = GTPV1_U_UDP_PORT;
+    self.gtpc_port = OGS_GTPV2_C_UDP_PORT;
+    self.gtpu_port = OGS_GTPV1_U_UDP_PORT;
 
     return OGS_OK;
 }
 
-static int sgw_context_validation()
+static int sgw_context_validation(void)
 {
     if (ogs_list_empty(&self.gtpc_list) &&
         ogs_list_empty(&self.gtpc_list6)) {
         ogs_error("No sgw.gtpc in '%s'",
-                context_self()->config.path);
+                ogs_config()->file);
         return OGS_ERROR;
     }
     if (ogs_list_empty(&self.gtpu_list) &&
         ogs_list_empty(&self.gtpu_list6)) {
         ogs_error("No sgw.gtpu in '%s'",
-                context_self()->config.path);
+                ogs_config()->file);
         return OGS_RETRY;
     }
     return OGS_OK;
 }
 
-int sgw_context_parse_config()
+int sgw_context_parse_config(void)
 {
     int rv;
-    config_t *config = &context_self()->config;
     yaml_document_t *document = NULL;
     ogs_yaml_iter_t root_iter;
 
-    ogs_assert(config);
-    document = config->document;
+    document = ogs_config()->document;
     ogs_assert(document);
 
     rv = sgw_context_prepare();
@@ -149,7 +140,7 @@ int sgw_context_parse_config()
                     do {
                         int family = AF_UNSPEC;
                         int i, num = 0;
-                        const char *hostname[MAX_NUM_OF_HOSTNAME];
+                        const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
                         uint16_t port = self.gtpc_port;
                         const char *dev = NULL;
                         ogs_sockaddr_t *addr = NULL;
@@ -197,7 +188,7 @@ int sgw_context_parse_config()
                                             break;
                                     }
 
-                                    ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
+                                    ogs_assert(num <= OGS_MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
 
@@ -229,7 +220,7 @@ int sgw_context_parse_config()
                         }
 
                         if (addr) {
-                            if (context_self()->config.parameter.no_ipv4 == 0) {
+                            if (ogs_config()->parameter.no_ipv4 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -237,7 +228,7 @@ int sgw_context_parse_config()
                                         &self.gtpc_list, AF_INET, dup);
                             }
 
-                            if (context_self()->config.parameter.no_ipv6 == 0) {
+                            if (ogs_config()->parameter.no_ipv6 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -250,9 +241,9 @@ int sgw_context_parse_config()
 
                         if (dev) {
                             rv = ogs_socknode_probe(
-                                    context_self()->config.parameter.no_ipv4 ?
+                                    ogs_config()->parameter.no_ipv4 ?
                                         NULL : &self.gtpc_list,
-                                    context_self()->config.parameter.no_ipv6 ?
+                                    ogs_config()->parameter.no_ipv6 ?
                                         NULL : &self.gtpc_list6,
                                     dev, self.gtpc_port);
                             ogs_assert(rv == OGS_OK);
@@ -264,9 +255,9 @@ int sgw_context_parse_config()
                     if (ogs_list_empty(&self.gtpc_list) &&
                         ogs_list_empty(&self.gtpc_list6)) {
                         rv = ogs_socknode_probe(
-                                context_self()->config.parameter.no_ipv4 ?
+                                ogs_config()->parameter.no_ipv4 ?
                                     NULL : &self.gtpc_list,
-                                context_self()->config.parameter.no_ipv6 ?
+                                ogs_config()->parameter.no_ipv6 ?
                                     NULL : &self.gtpc_list6,
                                 NULL, self.gtpc_port);
                         ogs_assert(rv == OGS_OK);
@@ -277,7 +268,7 @@ int sgw_context_parse_config()
                     do {
                         int family = AF_UNSPEC;
                         int i, num = 0;
-                        const char *hostname[MAX_NUM_OF_HOSTNAME];
+                        const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
                         uint16_t port = self.gtpu_port;
                         const char *dev = NULL;
                         ogs_sockaddr_t *addr = NULL;
@@ -325,7 +316,7 @@ int sgw_context_parse_config()
                                             break;
                                     }
 
-                                    ogs_assert(num <= MAX_NUM_OF_HOSTNAME);
+                                    ogs_assert(num <= OGS_MAX_NUM_OF_HOSTNAME);
                                     hostname[num++] = 
                                         ogs_yaml_iter_value(&hostname_iter);
 
@@ -357,7 +348,7 @@ int sgw_context_parse_config()
                         }
 
                         if (addr) {
-                            if (context_self()->config.parameter.no_ipv4 == 0) {
+                            if (ogs_config()->parameter.no_ipv4 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -365,7 +356,7 @@ int sgw_context_parse_config()
                                         &self.gtpu_list, AF_INET, dup);
                             }
 
-                            if (context_self()->config.parameter.no_ipv6 == 0) {
+                            if (ogs_config()->parameter.no_ipv6 == 0) {
                                 ogs_sockaddr_t *dup = NULL;
                                 rv = ogs_copyaddrinfo(&dup, addr);
                                 ogs_assert(rv == OGS_OK);
@@ -378,9 +369,9 @@ int sgw_context_parse_config()
 
                         if (dev) {
                             rv = ogs_socknode_probe(
-                                    context_self()->config.parameter.no_ipv4 ?
+                                    ogs_config()->parameter.no_ipv4 ?
                                         NULL : &self.gtpu_list,
-                                    context_self()->config.parameter.no_ipv6 ?
+                                    ogs_config()->parameter.no_ipv6 ?
                                         NULL : &self.gtpu_list6,
                                     dev, self.gtpu_port);
                             ogs_assert(rv == OGS_OK);
@@ -392,9 +383,9 @@ int sgw_context_parse_config()
                     if (ogs_list_empty(&self.gtpu_list) &&
                         ogs_list_empty(&self.gtpu_list6)) {
                         rv = ogs_socknode_probe(
-                                context_self()->config.parameter.no_ipv4 ?
+                                ogs_config()->parameter.no_ipv4 ?
                                     NULL : &self.gtpu_list,
-                                context_self()->config.parameter.no_ipv6 ?
+                                ogs_config()->parameter.no_ipv6 ?
                                     NULL : &self.gtpu_list6,
                                 NULL, self.gtpu_port);
                         ogs_assert(rv == OGS_OK);
@@ -412,12 +403,12 @@ int sgw_context_parse_config()
     return OGS_OK;
 }
 
-gtp_node_t *sgw_mme_add_by_message(gtp_message_t *message)
+ogs_gtp_node_t *sgw_mme_add_by_message(ogs_gtp_message_t *message)
 {
     int rv;
-    gtp_node_t *mme = NULL;
-    gtp_f_teid_t *mme_s11_teid = NULL;
-    gtp_create_session_request_t *req = &message->create_session_request;
+    ogs_gtp_node_t *mme = NULL;
+    ogs_gtp_f_teid_t *mme_s11_teid = NULL;
+    ogs_gtp_create_session_request_t *req = &message->create_session_request;
 
     if (req->sender_f_teid_for_control_plane.presence == 0) {
         ogs_error("No Sender F-TEID");
@@ -426,16 +417,16 @@ gtp_node_t *sgw_mme_add_by_message(gtp_message_t *message)
 
     mme_s11_teid = req->sender_f_teid_for_control_plane.data;
     ogs_assert(mme_s11_teid);
-    mme = gtp_node_find(&sgw_self()->mme_s11_list, mme_s11_teid);
+    mme = ogs_gtp_node_find(&sgw_self()->mme_s11_list, mme_s11_teid);
     if (!mme) {
-        mme = gtp_node_add(&sgw_self()->mme_s11_list, mme_s11_teid,
+        mme = ogs_gtp_node_add(&sgw_self()->mme_s11_list, mme_s11_teid,
             sgw_self()->gtpc_port,
-            context_self()->config.parameter.no_ipv4,
-            context_self()->config.parameter.no_ipv6,
-            context_self()->config.parameter.prefer_ipv4);
+            ogs_config()->parameter.no_ipv4,
+            ogs_config()->parameter.no_ipv6,
+            ogs_config()->parameter.prefer_ipv4);
         ogs_assert(mme);
 
-        rv = gtp_connect(
+        rv = ogs_gtp_connect(
                 sgw_self()->gtpc_sock, sgw_self()->gtpc_sock6, mme);
         ogs_assert(rv == OGS_OK);
     }
@@ -443,10 +434,10 @@ gtp_node_t *sgw_mme_add_by_message(gtp_message_t *message)
     return mme;
 }
 
-sgw_ue_t *sgw_ue_add_by_message(gtp_message_t *message)
+sgw_ue_t *sgw_ue_add_by_message(ogs_gtp_message_t *message)
 {
     sgw_ue_t *sgw_ue = NULL;
-    gtp_create_session_request_t *req = &message->create_session_request;
+    ogs_gtp_create_session_request_t *req = &message->create_session_request;
 
     if (req->imsi.presence == 0) {
         ogs_error("No IMSI");
@@ -471,10 +462,11 @@ sgw_ue_t *sgw_ue_add(uint8_t *imsi, int imsi_len)
 
     ogs_pool_alloc(&sgw_ue_pool, &sgw_ue);
     ogs_assert(sgw_ue);
+    memset(sgw_ue, 0, sizeof *sgw_ue);
 
     sgw_ue->sgw_s11_teid = ogs_pool_index(&sgw_ue_pool, sgw_ue);
     ogs_assert(sgw_ue->sgw_s11_teid > 0 &&
-                sgw_ue->sgw_s11_teid <= context_self()->pool.ue);
+                sgw_ue->sgw_s11_teid <= ogs_config()->pool.ue);
 
     /* Set IMSI */
     sgw_ue->imsi_len = imsi_len;
@@ -501,7 +493,7 @@ int sgw_ue_remove(sgw_ue_t *sgw_ue)
     return OGS_OK;
 }
 
-void sgw_ue_remove_all()
+void sgw_ue_remove_all(void)
 {
     sgw_ue_t *sgw_ue = NULL, *next = NULL;;
 
@@ -524,12 +516,13 @@ sgw_sess_t *sgw_sess_add(sgw_ue_t *sgw_ue, char *apn, uint8_t ebi)
 
     ogs_pool_alloc(&sgw_sess_pool, &sess);
     ogs_assert(sess);
+    memset(sess, 0, sizeof *sess);
 
     sess->sgw_s5c_teid = 
         SGW_S5C_INDEX_TO_TEID(ogs_pool_index(&sgw_sess_pool, sess));
 
     /* Set APN */
-    ogs_cpystrn(sess->pdn.apn, apn, MAX_APN_LEN+1);
+    ogs_cpystrn(sess->pdn.apn, apn, OGS_MAX_APN_LEN+1);
 
     sess->sgw_ue = sgw_ue;
     sess->gnode = NULL;
@@ -620,16 +613,17 @@ sgw_bearer_t* sgw_bearer_add(sgw_sess_t *sess)
 
     ogs_pool_alloc(&sgw_bearer_pool, &bearer);
     ogs_assert(bearer);
+    memset(bearer, 0, sizeof *bearer);
 
     bearer->sgw_ue = sgw_ue;
     bearer->sess = sess;
 
     ogs_list_init(&bearer->tunnel_list);
 
-    tunnel = sgw_tunnel_add(bearer, GTP_F_TEID_S1_U_SGW_GTP_U);
+    tunnel = sgw_tunnel_add(bearer, OGS_GTP_F_TEID_S1_U_SGW_GTP_U);
     ogs_assert(tunnel);
 
-    tunnel = sgw_tunnel_add(bearer, GTP_F_TEID_S5_S8_SGW_GTP_U);
+    tunnel = sgw_tunnel_add(bearer, OGS_GTP_F_TEID_S5_S8_SGW_GTP_U);
     ogs_assert(tunnel);
 
     ogs_list_add(&sess->bearer_list, bearer);
@@ -728,11 +722,12 @@ sgw_tunnel_t *sgw_tunnel_add(sgw_bearer_t *bearer, uint8_t interface_type)
 
     ogs_pool_alloc(&sgw_tunnel_pool, &tunnel);
     ogs_assert(tunnel);
+    memset(tunnel, 0, sizeof *tunnel);
 
     tunnel->interface_type = interface_type;
     tunnel->local_teid = ogs_pool_index(&sgw_tunnel_pool, tunnel);
     ogs_assert(tunnel->local_teid > 0 &&
-            tunnel->local_teid <= context_self()->pool.tunnel);
+            tunnel->local_teid <= ogs_config()->pool.tunnel);
 
     tunnel->bearer = bearer;
     tunnel->gnode = NULL;
@@ -789,12 +784,12 @@ sgw_tunnel_t *sgw_tunnel_find_by_interface_type(
 sgw_tunnel_t *sgw_s1u_tunnel_in_bearer(sgw_bearer_t *bearer)
 {
     return sgw_tunnel_find_by_interface_type(
-            bearer, GTP_F_TEID_S1_U_SGW_GTP_U);
+            bearer, OGS_GTP_F_TEID_S1_U_SGW_GTP_U);
 }
 sgw_tunnel_t *sgw_s5u_tunnel_in_bearer(sgw_bearer_t *bearer)
 {
     return sgw_tunnel_find_by_interface_type(
-            bearer, GTP_F_TEID_S5_S8_SGW_GTP_U);
+            bearer, OGS_GTP_F_TEID_S5_S8_SGW_GTP_U);
 }
 
 sgw_tunnel_t *sgw_tunnel_first(sgw_bearer_t *bearer)
