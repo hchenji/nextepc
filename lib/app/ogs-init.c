@@ -113,8 +113,13 @@ int ogs_app_initialize(const char *default_config, const char *const argv[])
     /**************************************************************************
      * Stage 5 : Setup Database Module
      */
-    if (ogs_env_get("DB_URI"))
+    if (ogs_env_get("DB_URI")) {
         ogs_config()->db_uri = ogs_env_get("DB_URI");
+
+        if (!memcmp(ogs_config()->db_uri, "consul://", 9)) {
+            ogs_config()->use_consul = true;
+        }
+    }
 
     return rv;
 }

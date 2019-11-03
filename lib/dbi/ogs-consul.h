@@ -17,29 +17,34 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef OGS_DB_H
-#define OGS_DB_H
+#if !defined(OGS_DBI_INSIDE) && !defined(OGS_DBI_COMPILATION)
+#error "This header cannot be included directly."
+#endif
 
-#include "ogs-core.h"
+#ifndef OGS_CONSUL_H
+#define OGS_CONSUL_H
 
-#define OGS_DBI_INSIDE
-
-#include "dbi/ogs-mongoc.h"
-#include "dbi/ogs-consul.h"
-
-#undef OGS_DBI_INSIDE
 
 #ifdef __cplusplus
 extern "C" {
-#endif
+#endif /* __cplusplus */
 
-extern int __ogs_dbi_domain;
+#include <consul_http.h>
 
-#undef OGS_LOG_DOMAIN
-#define OGS_LOG_DOMAIN __ogs_dbi_domain
+typedef struct ogs_consul_s {
+    bool initialized;
+    const char *name;
+    void *uri;
+    void *client;
+    void *database;
+} ogs_consul_t;
+
+int ogs_consul_init(const char *db_uri);
+void ogs_consul_final(void);
+ogs_consul_t *ogs_consul(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* OGS_DB_H */
+#endif /* OGS_CONSUL_H */

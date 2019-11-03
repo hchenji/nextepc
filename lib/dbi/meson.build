@@ -21,9 +21,27 @@ libdbi_sources = files('''
     ogs-mongoc.h
 
     ogs-mongoc.c
+
+    ogs-consul.h
+
+    ogs-consul.c
+
+    base64.c
+
+    base64.h
+
+    consul_http.c
+
+    consul_http.h
+
+    jsmn.c
+
+    jsmn.h
 '''.split())
 
 libmongoc_dep = dependency('libmongoc-1.0')
+
+libcurl4_dep = dependency('libcurl')
 
 libdbi_inc = include_directories('.')
 
@@ -32,10 +50,10 @@ libdbi = library('ogsdbi',
     version : libogslib_version,
     c_args : '-DOGS_DBI_COMPILATION',
     include_directories : [libdbi_inc, libinc],
-    dependencies : [libcore_dep, libmongoc_dep],
+    dependencies : [libcore_dep, libmongoc_dep, libcurl4_dep],
     install : true)
 
 libdbi_dep = declare_dependency(
     link_with : libdbi,
     include_directories : [libdbi_inc, libinc],
-    dependencies : [libcore_dep, libmongoc_dep])
+    dependencies : [libcore_dep, libmongoc_dep, libcurl4_dep])

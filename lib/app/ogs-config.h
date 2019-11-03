@@ -34,6 +34,7 @@ typedef struct ogs_config_s {
     const char *file;
     void *document;
 
+    bool use_consul;
     const char *db_uri;
     struct {
         const char *file;

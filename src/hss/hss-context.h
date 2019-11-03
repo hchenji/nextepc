@@ -65,11 +65,18 @@ int hss_db_init(void);
 int hss_db_final(void);
 
 int hss_db_auth_info(char *imsi_bcd, hss_db_auth_info_t *auth_info);
+int hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info);
 int hss_db_update_rand_and_sqn(char *imsi_bcd, uint8_t *rand, uint64_t sqn);
+int hss_db_update_rand_and_sqn_consul(char *imsi_bcd, uint8_t *rand, uint64_t sqn);
 int hss_db_increment_sqn(char *imsi_bcd);
+int hss_db_increment_sqn_consul(char *imsi_bcd);
 
 int hss_db_subscription_data(
     char *imsi_bcd, ogs_diam_s6a_subscription_data_t *subscription_data);
+
+int hss_db_subscription_data_consul(
+    char *imsi_bcd, ogs_diam_s6a_subscription_data_t *subscription_data);
+
 
 #ifdef __cplusplus
 }

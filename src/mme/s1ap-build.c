@@ -443,7 +443,7 @@ int s1ap_build_initial_context_setup_request(
 //				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[1]);
 //				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[0]);
 
-				memcpy(e_rab->transportLayerAddress.buf, &antelope.sin_addr.s_addr, IPV4_LEN);
+				memcpy(e_rab->transportLayerAddress.buf, &antelope.sin_addr.s_addr, OGS_IPV4_LEN);
 
 //				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[3]);
 //				printf("buf contents is %0x\n", e_rab->transportLayerAddress.buf[2]);

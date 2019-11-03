@@ -19,7 +19,7 @@
 
 #include "ogs-dbi.h"
 #include "pcrf-context.h"
-#include "app/consul_http.h"
+#include "consul_http.h"
 
 static pcrf_context_t self;
 static ogs_diam_config_t g_diam_conf;
@@ -266,9 +266,10 @@ int pcrf_db_init()
 {
     int rv;
 
-    // TODO looks like context_self() is now ogs_mongoc()
     //  consul doesn't need state
-    if (context_self()->use_consul) {
+    if (ogs_config()->use_consul) {
+        ogs_warn("Consul initialized\n");
+        ogs_consul_init(ogs_config()->db_uri);
         return OGS_OK;
     }
 
@@ -286,6 +287,12 @@ int pcrf_db_init()
 
 int pcrf_db_final()
 {
+    if (ogs_config()->use_consul) {
+        ogs_warn("Consul going to be finalized\n");
+        ogs_consul_final();
+        return OGS_OK;
+    }
+
     if (self.subscriberCollection) {
         mongoc_collection_destroy(self.subscriberCollection);
     }
@@ -300,22 +307,23 @@ int pcrf_db_qos_data_consul(char *imsi_bcd, char *apn,
 
 //	d_error("apn is %s\n", apn);
 
-	context_t *ctxt = context_self();
+	ogs_consul_t *ctxt = ogs_consul();
 	char qkey[1024];
 
 	sprintf(qkey, "subscribers/%s/pdn", imsi_bcd);
-	char *val = consul_get(ctxt->db.client, qkey);
+	char *val = consul_get(ctxt->client, qkey);
 
 	bool found = false;
 	//	parse pdn_list
 	unsigned char *pdnarr = json_int_arr_to_native(val);
 	free(val);
 
-	for (int var = 1; var < pdnarr[0] + 1; ++var) {
+    int var = 1;
+	for (var = 1; var < pdnarr[0] + 1; ++var) {
 		int pdnnum = pdnarr[var];
 
 		sprintf(qkey, "pdn/%d", pdnnum);
-		consul_kv_t *ll = consul_get_recurse(ctxt->db.client, qkey);
+		consul_kv_t *ll = consul_get_recurse(ctxt->client, qkey);
 
 		//	iterate thru the linked list consisting of pdn info
 		consul_kv_t *tmp = ll;
@@ -335,7 +343,7 @@ int pcrf_db_qos_data_consul(char *imsi_bcd, char *apn,
 
 		if (found) {
 			//	this is the right pdn
-			pdn_t *pdn = NULL;
+			ogs_pdn_t *pdn = NULL;
 			pdn = &gx_message->pdn;
 
 			//	reiterate thru list
@@ -345,7 +353,7 @@ int pcrf_db_qos_data_consul(char *imsi_bcd, char *apn,
 				char *key = tmp->key;
 
 				if (!strcmp(key + len - 3, "apn")) {
-					strncpy(pdn->apn, tmp->val, ogs_min(strlen(tmp->val), MAX_APN_LEN) + 1);
+					strncpy(pdn->apn, tmp->val, ogs_min(strlen(tmp->val), OGS_MAX_APN_LEN) + 1);
 //					d_print("apn is %s\n", pdn->apn);
 				} else if (!strcmp(key + len - 4, "type")) {
 					pdn->pdn_type = strtol(tmp->val, NULL, 10);
@@ -377,7 +385,7 @@ int pcrf_db_qos_data(char *imsi_bcd, char *apn,
         ogs_diam_gx_message_t *gx_message)
 {
 
-	if (context_self()->use_consul) {
+	if (ogs_config()->use_consul) {
 		return pcrf_db_qos_data_consul(imsi_bcd, apn, gx_message);
 	}
 

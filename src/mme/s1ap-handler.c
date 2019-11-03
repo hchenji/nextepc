@@ -499,7 +499,7 @@ void s1ap_handle_initial_context_setup_response(
             struct sockaddr_in antelope;
             inet_aton(ogs_env_get("NEPC_MME_ENB_TLADDR"), &antelope.sin_addr); // store IP in antelope
             ogs_info("enb ip env override is %s", INET_NTOP(&antelope.sin_addr.s_addr, buf));
-            memcpy(e_rab->transportLayerAddress.buf, &antelope.sin_addr.s_addr, IPV4_LEN);
+            memcpy(e_rab->transportLayerAddress.buf, &antelope.sin_addr.s_addr, OGS_IPV4_LEN);
         }
 
         rv = ogs_s1ap_BIT_STRING_to_ip(

@@ -56,6 +56,9 @@ int pcrf_context_parse_config(void);
 int pcrf_db_init(void);
 int pcrf_db_final(void);
 
+int pcrf_db_qos_data_consul(char *imsi_bcd, char *apn,
+        ogs_diam_gx_message_t *gx_message);
+
 int pcrf_db_qos_data(char *imsi_bcd, char *apn,
         ogs_diam_gx_message_t *gx_message);
 

@@ -19,7 +19,7 @@
 
 #include "ogs-dbi.h"
 #include "hss-context.h"
-#include "app/consul_http.h"
+#include "consul_http.h"
 
 static hss_context_t self;
 static ogs_diam_config_t g_diam_conf;
@@ -256,12 +256,12 @@ int hss_db_init()
 {
     int rv;
 
-    // TODO
     //  consul doesn't need state
-    // if (context_self()->use_consul) {
-    //          d_print("Consul initialized\n");
-        // return OGS_OK;
-    // }
+    if (ogs_config()->use_consul) {
+        ogs_warn("Consul initialized\n");
+        rv = ogs_consul_init(ogs_config()->db_uri);
+        return rv;
+    }
 
     rv = ogs_mongoc_init(ogs_config()->db_uri);
     if (rv != OGS_OK) return rv;
@@ -277,6 +277,13 @@ int hss_db_init()
 
 int hss_db_final()
 {
+
+    if (ogs_config()->use_consul) {
+        ogs_warn("Consul going to be finalized\n");
+        ogs_consul_final();
+        return OGS_OK;
+    }
+
     if (self.subscriberCollection) {
         mongoc_collection_destroy(self.subscriberCollection);
     }
@@ -287,14 +294,14 @@ int hss_db_final()
 }
 
 int hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info) {
-	context_t *self = context_self();
+	ogs_consul_t *self = ogs_consul();
 
 //	d_error("imsi is %s\n", imsi_bcd);
 
 //	see if imsi exists
 	char qkey[1024];
 	sprintf(qkey, "subscribers/%s", imsi_bcd);
-	consul_kv_t *ll = consul_get_recurse(self->db.client, qkey);
+	consul_kv_t *ll = consul_get_recurse(self->client, qkey);
 
 	if (ll == NULL) {
 		ogs_warn("Auth Info: Cannot find IMSI in DB : %s", imsi_bcd);
@@ -331,7 +338,7 @@ int hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info) {
 
 		else if (!strcmp(key + len - 4, "rand")) {
 			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->rand,
-					RAND_LEN);
+					OGS_RAND_LEN);
 		}
 
 		else if (!strcmp(key + len - 3, "sqn")) {
@@ -349,7 +356,7 @@ int hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info) {
 int hss_db_auth_info(char *imsi_bcd, hss_db_auth_info_t *auth_info)
 {
 
-	if (context_self()->use_consul) {
+	if (ogs_config()->use_consul) {
 		return hss_db_auth_info_consul(imsi_bcd, auth_info);
 	}
 
@@ -438,21 +445,21 @@ int hss_db_update_rand_and_sqn_consul(char *imsi_bcd, uint8_t *rand, uint64_t sq
 
 //	d_error("imsi is %s\n", imsi_bcd);
 
-	context_t *ctxt = context_self();
+	ogs_consul_t *ctxt = ogs_consul();
 	char printable_rand[128];
 
 	ogs_assert(rand);
-	ogs_hex_to_ascii(rand, RAND_LEN, printable_rand, sizeof(printable_rand));
+	ogs_hex_to_ascii(rand, OGS_RAND_LEN, printable_rand, sizeof(printable_rand));
 
 	char qkey[1024];
 
 	sprintf(qkey, "subscribers/%s/rand", imsi_bcd);
-	consul_put(ctxt->db.client, qkey, printable_rand);
+	consul_put(ctxt->client, qkey, printable_rand);
 
 	sprintf(qkey, "subscribers/%s/sqn", imsi_bcd);
 	char val[1024];
 	sprintf(val, "%ld", sqn);
-	consul_put(ctxt->db.client, qkey, val);
+	consul_put(ctxt->client, qkey, val);
 
 	return OGS_OK;
 }
@@ -461,7 +468,7 @@ int hss_db_update_rand_and_sqn(
     char *imsi_bcd, uint8_t *rand, uint64_t sqn)
 {
 
-	if (context_self()->use_consul) {
+	if (ogs_config()->use_consul) {
 		return hss_db_update_rand_and_sqn_consul(imsi_bcd, rand, sqn);
 	}
 
@@ -501,19 +508,19 @@ int hss_db_increment_sqn_consul(char *imsi_bcd) {
 
 //	d_error("imsi is %s\n", imsi_bcd);
 
-	context_t *ctxt = context_self();
+	ogs_consul_t *ctxt = ogs_consul();
 	char qkey[1024];
 
 	sprintf(qkey, "subscribers/%s/sqn", imsi_bcd);
 
-	char *val = consul_get(ctxt->db.client, qkey);
+	char *val = consul_get(ctxt->client, qkey);
 	uint64_t sqn = strtol(val, NULL, 10);
 	sqn++;
 
 	char put[1024];
 	sprintf(put, "%ld", sqn);
 
-	consul_put(ctxt->db.client, qkey, put);
+	consul_put(ctxt->client, qkey, put);
 
 	free(val);
 
@@ -522,7 +529,7 @@ int hss_db_increment_sqn_consul(char *imsi_bcd) {
 
 int hss_db_increment_sqn(char *imsi_bcd)
 {
-	if (context_self()->use_consul) {
+	if (ogs_config()->use_consul) {
 		return hss_db_increment_sqn_consul(imsi_bcd);
 	}
 
@@ -570,22 +577,22 @@ out:
 }
 
 //	TODO: very incomplete, take in pgw ip address and other stuff from db
-int hss_db_subscription_data_consul(char *imsi_bcd, s6a_subscription_data_t *subscription_data) {
+int hss_db_subscription_data_consul(char *imsi_bcd, ogs_diam_s6a_subscription_data_t *subscription_data) {
 
 //	d_error("imsi is %s", imsi_bcd);
 
-	context_t *ctxt = context_self();
+	ogs_consul_t *ctxt = ogs_consul();
 	char qkey[1024];
 
 	sprintf(qkey, "subscribers/%s", imsi_bcd);
-	consul_kv_t *ll = consul_get_recurse(ctxt->db.client, qkey);
+	consul_kv_t *ll = consul_get_recurse(ctxt->client, qkey);
 
 	if (ll == NULL) {
 		ogs_warn("Cannot find IMSI in DB : %s", imsi_bcd);
 		return OGS_ERROR;
 	}
 
-	memset(subscription_data, 0, sizeof(s6a_subscription_data_t));
+	memset(subscription_data, 0, sizeof(ogs_diam_s6a_subscription_data_t));
 
 	char pdn_list[1024];
 
@@ -621,14 +628,15 @@ int hss_db_subscription_data_consul(char *imsi_bcd, s6a_subscription_data_t *sub
 
 	//	parse pdn_list
 	unsigned char *pdnarr = json_int_arr_to_native(pdn_list);
-	for (int var = 1; var < pdnarr[0] + 1; ++var) {
+	int var = 1;
+    for (var = 1; var < pdnarr[0] + 1; ++var) {
 		int pdnnum = pdnarr[var];
-		pdn_t *pdn = NULL;
+		ogs_pdn_t *pdn = NULL;
 		pdn = &subscription_data->pdn[pdnnum];
 		subscription_data->num_of_pdn++;
 
 		sprintf(qkey, "pdn/%d", pdnnum);
-		ll = consul_get_recurse(ctxt->db.client, qkey);
+		ll = consul_get_recurse(ctxt->client, qkey);
 
 		//	iterate thru the linked list consisting of pdn info
 		consul_kv_t *tmp = ll;
@@ -637,7 +645,7 @@ int hss_db_subscription_data_consul(char *imsi_bcd, s6a_subscription_data_t *sub
 			char *key = tmp->key;
 
 			if (!strcmp(key + len - 3, "apn")) {
-				strncpy(pdn->apn, tmp->val, ogs_min(strlen(tmp->val), MAX_APN_LEN) + 1);
+				strncpy(pdn->apn, tmp->val, ogs_min(strlen(tmp->val), OGS_MAX_APN_LEN) + 1);
 //				d_error("apn is %s", pdn->apn);
 			} else if (!strcmp(key + len - 4, "type")) {
 				pdn->pdn_type = strtol(tmp->val, NULL, 10);
@@ -667,7 +675,7 @@ int hss_db_subscription_data_consul(char *imsi_bcd, s6a_subscription_data_t *sub
 int hss_db_subscription_data(
     char *imsi_bcd, ogs_diam_s6a_subscription_data_t *subscription_data)
 {
-	if (context_self()->use_consul) {
+	if (ogs_config()->use_consul) {
 		return hss_db_subscription_data_consul(imsi_bcd, subscription_data);
 	}
 
