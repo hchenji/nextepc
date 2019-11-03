@@ -1,0 +1,62 @@
+usr/lib/*/libogs*.so*
+usr/lib/*/libfd*.so*
+usr/lib/*/freeDiameter/*.fdx
+
+usr/bin/open5gs-hssd
+usr/bin/open5gs-mmed
+usr/bin/open5gs-pgwd
+usr/bin/open5gs-sgwd
+usr/bin/open5gs-pcrfd
+
+configs/open5gs/pcrf.yaml etc/open5gs
+configs/open5gs/hss.yaml etc/open5gs
+configs/open5gs/mme.yaml etc/open5gs
+configs/open5gs/pgw.yaml etc/open5gs
+configs/open5gs/sgw.yaml etc/open5gs
+
+configs/freeDiameter/hss.* etc/freeDiameter
+configs/freeDiameter/mme.* etc/freeDiameter
+configs/freeDiameter/pgw.* etc/freeDiameter
+configs/freeDiameter/pcrf.* etc/freeDiameter
+configs/freeDiameter/cacert.pem /etc/freeDiameter
+
+
+
+
+
+
+
+
+
+
+
+
+
+usr/lib/*/open5gs/*
+var/log/open5gs
+support/logrotate/open5gs /etc/logrotate.d
+usr/bin/open5gs-epcd
+usr/bin/open5gs-sgwd
+usr/bin/open5gs-hssd
+usr/bin/open5gs-pcrfd
+usr/bin/open5gs-pgwd
+usr/bin/open5gs-mmed
+etc/open5gs/hss.conf
+etc/open5gs/sgw.conf
+etc/open5gs/open5gs.conf
+etc/open5gs/pcrf.conf
+etc/open5gs/pgw.conf
+etc/open5gs/mme.conf
+etc/open5gs/freeDiameter/cacert.pem
+etc/open5gs/freeDiameter/hss.conf
+etc/open5gs/freeDiameter/hss.cert.pem
+etc/open5gs/freeDiameter/hss.key.pem
+etc/open5gs/freeDiameter/mme.conf
+etc/open5gs/freeDiameter/mme.cert.pem
+etc/open5gs/freeDiameter/mme.key.pem
+etc/open5gs/freeDiameter/pcrf.conf
+etc/open5gs/freeDiameter/pcrf.cert.pem
+etc/open5gs/freeDiameter/pcrf.key.pem
+etc/open5gs/freeDiameter/pgw.conf
+etc/open5gs/freeDiameter/pgw.cert.pem
+etc/open5gs/freeDiameter/pgw.key.pem
