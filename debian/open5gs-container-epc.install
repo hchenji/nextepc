@@ -1,19 +1,16 @@
 usr/lib/*/libogs*.so*
 usr/lib/*/libfd*.so*
 usr/lib/*/freeDiameter/*.fdx
-
 usr/bin/open5gs-hssd
 usr/bin/open5gs-mmed
 usr/bin/open5gs-pgwd
 usr/bin/open5gs-sgwd
 usr/bin/open5gs-pcrfd
-
 configs/open5gs/pcrf.yaml etc/open5gs
 configs/open5gs/hss.yaml etc/open5gs
 configs/open5gs/mme.yaml etc/open5gs
 configs/open5gs/pgw.yaml etc/open5gs
 configs/open5gs/sgw.yaml etc/open5gs
-
 configs/freeDiameter/hss.* etc/freeDiameter
 configs/freeDiameter/mme.* etc/freeDiameter
 configs/freeDiameter/pgw.* etc/freeDiameter
