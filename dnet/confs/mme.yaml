@@ -1,0 +1,37 @@
+logger:
+    file: /var/log/open5gs/mme.log
+
+parameter:
+    no_ipv6: true
+
+mme:
+    freeDiameter: /etc/freeDiameter/mme.conf
+    s1ap:
+        - addr:
+    gtpc:
+        - addr:
+    gummei: 
+      plmn_id:
+        mcc: 998
+        mnc: 98
+      mme_gid: 4
+      mme_code: 1
+    tai:
+      plmn_id:
+        mcc: 998
+        mnc: 98
+      tac: 7
+    security:
+        integrity_order : [ EIA1, EIA2, EIA0 ]
+        ciphering_order : [ EEA0, EEA1, EEA2 ]
+    network_name:
+        full: wsrg
+
+sgw:
+    gtpc:
+      addr: sgw.localdomain
+
+pgw:
+    gtpc:
+      addr:
+        - pgw.localdomain
