@@ -20,7 +20,9 @@ services:
         # aliases:
           # - mme.localdomain
       # frontend:
-
+    cap_add:
+      - NET_ADMIN
+      
     environment:
       DB_URI: "consul://${DC_CONSUL_IP}:8500/open5gs"
       NEPC_MME_NETNAME_SHORT: dnet
@@ -32,8 +34,10 @@ services:
       NEPC_MME_SGW_TLADDR: ${EXT_IP_EPC}    # this is the reachable IP of the EPC
       # NEPC_MME_ENB_TLADDR: ${EXT_IP_ENB}    # this is the external IP of the ENB
     command: /bin/bash -c "/usr/bin/open5gs-mmed -c /etc/open5gs/mme.yaml"
+    # command: /bin/bash
+
     volumes:
-      - ./freeDiameter:/etc/open5gs/freeDiameter
+      - ./freeDiameter:/etc/freeDiameter
       - ./confs/mme.yaml:/etc/open5gs/mme.yaml
       - ./loggy:/var/log/open5gs
     extra_hosts:
@@ -49,14 +53,18 @@ services:
       MONGOC_DISABLE_SHM: 1
     image: wsrg/o5gs
     # network_mode: "dnet"
+    cap_add:
+      - NET_ADMIN
     networks:
       default:
         aliases:
           - hss.localdomain
         ipv4_address: 172.22.11.2
     command: /bin/bash -c "/usr/bin/open5gs-hssd -c /etc/open5gs/hss.yaml"
+    # command: /bin/bash
+
     volumes:
-      - ./freeDiameter:/etc/open5gs/freeDiameter
+      - ./freeDiameter:/etc/freeDiameter
       - ./confs/hss.yaml:/etc/open5gs/hss.yaml
       - ./loggy:/var/log/open5gs
     extra_hosts:
@@ -74,13 +82,15 @@ services:
     ports:
       - "2152:2152/udp"
     command: /bin/bash -c "/usr/bin/open5gs-sgwd -c /etc/open5gs/sgw.yaml"
+    # command: /bin/bash
+
     environment:
       NEPC_SGW_GTPC_ADDR: 172.22.11.3
       NEPC_SGW_GTPU_ADDR: 172.22.11.3
       NEPC_FD_CLIENT_SRC_ADDR: ${INTERFACE_IP}
       MONGOC_DISABLE_SHM: 1
     volumes:
-      - ./freeDiameter:/etc/open5gs/freeDiameter
+      - ./freeDiameter:/etc/freeDiameter
       - ./confs/sgw.yaml:/etc/open5gs/sgw.yaml
       - ./loggy:/var/log/open5gs
     extra_hosts:
@@ -99,8 +109,10 @@ services:
           - pcrf.localdomain
         ipv4_address: 172.22.11.4
     command: /bin/bash -c "/usr/bin/open5gs-pcrfd -c /etc/open5gs/pcrf.yaml"
+    # command: /bin/bash
+
     volumes:
-      - ./freeDiameter:/etc/open5gs/freeDiameter
+      - ./freeDiameter:/etc/freeDiameter
       - ./confs/pcrf.yaml:/etc/open5gs/pcrf.yaml
       - ./loggy:/var/log/open5gs
     extra_hosts:
@@ -130,10 +142,12 @@ services:
           - pgw.localdomain
         ipv4_address: 172.22.11.5
     command: /bin/bash -c "env; /root/settun.sh; ip a; /usr/bin/open5gs-pgwd -c /etc/open5gs/pgw.yaml"
+    # command: /bin/bash
+
     devices:
       - "/dev/net/tun:/dev/net/tun"
     volumes:
-      - ./freeDiameter:/etc/open5gs/freeDiameter
+      - ./freeDiameter:/etc/freeDiameter
       - ./confs/pgw.yaml:/etc/open5gs/pgw.yaml
       - ./loggy:/var/log/open5gs
     sysctls:
