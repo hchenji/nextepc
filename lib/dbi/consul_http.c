@@ -10,24 +10,24 @@
 #include <stdlib.h>
 #include "jsmn.h"
 #include "base64.h"
+#include "ogs-core.h"
 
 size_t write_data(char *buffer, size_t size, size_t nmemb, void *userp) {
 
-	//	userp is the actual buf. copy buffer into userp
-	char* buf = (char *) userp;
-
+	//	userp is my buf. copy buffer into userp
+	consul_buf_t *cbuf = (consul_buf_t *) userp;
 	size_t total = size * nmemb;
-//	printf("total %zu\n", total);
-//	printf("last char %x\n", buffer[total]);
-	memcpy(buf, buffer, total);
-	buf[total] = '\0';
-//	puts(buf);
+//	ogs_warn("total is %zu last char is %x", total, buffer[total]);
+	memcpy(cbuf->buf + cbuf->curr_ptr, buffer, total);
+	cbuf->curr_ptr += total;
+	cbuf->buf[cbuf->curr_ptr] = '\0';
+//	ogs_warn("current buf is %s", cbuf->buf);
 
 	return total;
 
 }
 
-CURLcode curl_get(char *url, char *buf) {
+CURLcode curl_get(char *url, consul_buf_t *cbuf) {
 	CURL *curl;
 	CURLcode res;
 
@@ -37,7 +37,7 @@ CURLcode curl_get(char *url, char *buf) {
 		return CURLE_FAILED_INIT;
 
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, buf);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, cbuf);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, true);
 	curl_easy_setopt(curl, CURLOPT_TCP_FASTOPEN, 1L);
@@ -45,9 +45,7 @@ CURLcode curl_get(char *url, char *buf) {
 	res = curl_easy_perform(curl);
 
 	if (res != CURLE_OK) {
-		puts("http error occurred");
-		puts(url);
-		puts(buf);
+		ogs_error("http error occurred for url %s buf %s\n", url, cbuf->buf);
 	}
 
 	/* always cleanup */
@@ -56,7 +54,7 @@ CURLcode curl_get(char *url, char *buf) {
 	return res;
 }
 
-CURLcode curl_put(char *url, char *data, char *response) {
+CURLcode curl_put(char *url, char *data, consul_buf_t *response) {
 	CURL *curl;
 	CURLcode res;
 
@@ -77,7 +75,7 @@ CURLcode curl_put(char *url, char *data, char *response) {
 	res = curl_easy_perform(curl);
 
 	if (res != CURLE_OK) {
-		puts("http error occurred");
+		ogs_error("http error occurred for url %s data %s\n", url, data);
 	}
 
 	/* always cleanup */
@@ -97,21 +95,21 @@ void print_substring(const char *str, int skip, int size)
 char* consul_get(consul_client_t* cli, char* key)
 {
 
-	char buf[1024];
+	consul_buf_t *cbuf = ogs_calloc(1, sizeof(consul_buf_t));
+
 	char url[1024];
+	memset(url, 0, 1024*sizeof(char));
 
 	strcpy(url, cli->url);
 	strcat(url, key);
-	curl_get(url, buf);
-
-//	puts(buf);
+	curl_get(url, cbuf);
 
 	jsmn_parser parser;
 	jsmntok_t tokens[256];
 	int r;
 
 	jsmn_init(&parser);
-	r = jsmn_parse(&parser, buf, strlen(buf), tokens, 256);
+	r = jsmn_parse(&parser, cbuf->buf, strlen(cbuf->buf), tokens, 256);
 
 //	printf("%d tokens parsed \n", r);
 
@@ -131,7 +129,7 @@ char* consul_get(consul_client_t* cli, char* key)
 		if (t->type != JSMN_STRING)
 			continue;
 //		printf("%d\n", i);
-		if (!memcmp(buf + t->start, "Value", 5)) {
+		if (!memcmp(cbuf->buf + t->start, "Value", 5)) {
 			valtok = &tokens[i+1];
 //			printf("%d\n", i+1);
 			break;
@@ -139,25 +137,30 @@ char* consul_get(consul_client_t* cli, char* key)
 	}
 
 	char* decd = malloc(sizeof(char) * 64);
-	int len = Base64decode(decd, buf + valtok->start);
+	int len = Base64decode(decd, cbuf->buf + valtok->start);
 	decd[len] = 0;
 //	printf("decoded key value is %.*s : %s\n", (keytok->end - keytok->start), buf + keytok->start, decd);
 
+	ogs_free(cbuf);
 	return decd;
 }
 
-char* consul_put(consul_client_t* cli, char* key, char* val)
+void consul_put(consul_client_t* cli, char* key, char* val)
 {
-	char *response = malloc(1024);
+	consul_buf_t *cbuf = ogs_calloc(1, sizeof(consul_buf_t));
 
 	char url[1024];
 	strcpy(url, cli->url);
 	strcat(url, key);
 
-	curl_put(url, val, response);
+	curl_put(url, val, cbuf);
 
-	return response;
+	//TODO: return err code
+	ogs_free(cbuf);
+
+//	return cbuf->buf;
 }
+
 consul_kv_t* consul_get_all(consul_client_t* cli)
 {
 	return consul_get_recurse(cli, "");
@@ -176,24 +179,30 @@ consul_client_t* consul_client_init(char* uri, char* dbname)
 
 	return cli;
 }
-consul_kv_t* consul_get_recurse(consul_client_t* cli, char* key)
+
+
+consul_kv_t* consul_get_recurse(consul_client_t* cli, const char* key)
 {
-	char buf[20480];
+	consul_buf_t *cbuf = ogs_calloc(1, sizeof(consul_buf_t));
+
 	char url[1024];
+	memset(url, 0, 1024*sizeof(char));
 
 	strcpy(url, cli->url);
 	strcat(url, key);
 	strcat(url, "?recurse=");
-	curl_get(url, buf);
+//	ogs_warn("url is %s\n", url);
 
-//	puts(buf);
+	curl_get(url, cbuf);
+
+//	ogs_warn("buf in get recurse answer is %s\n", cbuf->buf);
 
 	jsmn_parser parser;
-	jsmntok_t tokens[256];
+	jsmntok_t tokens[512];
 	int r;
 
 	jsmn_init(&parser);
-	r = jsmn_parse(&parser, buf, strlen(buf), tokens, 256);
+	r = jsmn_parse(&parser, cbuf->buf, strlen(cbuf->buf), tokens, 512);
 
 	consul_kv_t *head = NULL;
 	consul_kv_t *ll = head;
@@ -222,25 +231,27 @@ consul_kv_t* consul_get_recurse(consul_client_t* cli, char* key)
 		}
 
 		//	scan until you get the "key" field
-		while (memcmp(buf + t++->start, "Key", 3));
+		while (memcmp(cbuf->buf + t++->start, "Key", 3));
 
-//		printf("%.*s\n", (t->end - t->start), buf + t->start);
+//		ogs_warn("end-start is %.*s\n", (t->end - t->start), buf + t->start);
 
 		//	current token must be the actual key
-		memcpy(ll->key, buf + t->start, (t->end - t->start));
+		memcpy(ll->key, cbuf->buf + t->start, (t->end - t->start));
 		ll->key[(t->end - t->start)] = 0;
+//		ogs_warn("key is %s\n", ll->key);
 
 		//	scan until you get the "value" field
-		while (memcmp(buf + t++->start, "Value", 5));
+		while (memcmp(cbuf->buf + t++->start, "Value", 5));
 
-//		printf("%.*s\n", (t->end - t->start), buf + t->start);
+//		ogs_warn("end-start value is %.*s\n", (t->end - t->start), buf + t->start);
 
 		//	current token must be the actual value
-		int len = Base64decode(ll->val, buf + t->start);
+		int len = Base64decode(ll->val, cbuf->buf + t->start);
 		(ll->val)[len] = 0;
-
+//		ogs_warn("decoded val is %s\n", ll->val);
 	}
 
+	ogs_free(cbuf);
 	return head;
 }
 

@@ -2,14 +2,6 @@ version: '3.7'
 
 services:
 # mme is now going to be host only
-
-  epc:
-    image: wsrg/o5gs
-    build:
-      context: .
-      args:
-        arch: ${TAG-amd64}
-
   mme:
     depends_on:
       - hss
@@ -24,7 +16,7 @@ services:
       - NET_ADMIN
       
     environment:
-      DB_URI: "consul://${DC_CONSUL_IP}:8500/open5gs"
+      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
       NEPC_MME_NETNAME_SHORT: dnet
       NEPC_MME_NETNAME: dnet
       NEPC_MME_S1AP_ADDR: ${INTERFACE_IP}
@@ -49,7 +41,7 @@ services:
 #hss is on br-dnet
   hss:
     environment:
-      DB_URI: "consul://${DC_CONSUL_IP}:8500/open5gs"
+      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
       MONGOC_DISABLE_SHM: 1
     image: wsrg/o5gs
     # network_mode: "dnet"
@@ -99,7 +91,7 @@ services:
 #pcrf is on br-dnet
   pcrf:
     environment:
-      DB_URI: "consul://${DC_CONSUL_IP}:8500/open5gs"
+      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
       MONGOC_DISABLE_SHM: 1
 
     image: wsrg/o5gs

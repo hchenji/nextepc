@@ -297,10 +297,14 @@ int hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info) {
 	ogs_consul_t *self = ogs_consul();
 
 //	d_error("imsi is %s\n", imsi_bcd);
+//	ogs_warn("in authinfo consul\n");
 
-//	see if imsi exists
+	//	see if imsi exists
 	char qkey[1024];
 	sprintf(qkey, "subscribers/%s", imsi_bcd);
+
+//	ogs_warn("calling get_recurse with key %s\n", qkey);
+
 	consul_kv_t *ll = consul_get_recurse(self->client, qkey);
 
 	if (ll == NULL) {
@@ -313,35 +317,38 @@ int hss_db_auth_info_consul(char *imsi_bcd, hss_db_auth_info_t *auth_info) {
 	consul_kv_t *tmp = ll;
 	while (tmp != NULL) {
 		size_t len = strlen(tmp->key);
+//		ogs_warn("key is %s len is %zu", tmp->key, len);
 		char *key = tmp->key;
 
-		if (!strcmp(key + len - 1, "k")) {
-			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->k,
-					HSS_KEY_LEN);
+		if (!strcmp(key + len - 2, "/k")) {
+			uint8_t tmp_buf[HSS_KEY_LEN];
+//			ogs_warn("length of tmp->val in k is %zu", strlen(tmp->val));
+			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), tmp_buf, HSS_KEY_LEN);
+			memcpy(auth_info->k, tmp_buf, HSS_KEY_LEN);
 		}
 
-		else if (!strcmp(key + len - 3, "opc")) {
+		else if (!strcmp(key + len - 4, "/opc")) {
 			auth_info->use_opc = 1;
 			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->opc,
 					HSS_KEY_LEN);
 		}
 
-		else if (!strcmp(key + len - 2, "op")) {
+		else if (!strcmp(key + len - 3, "/op")) {
 			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->op,
 					HSS_KEY_LEN);
 		}
 
-		else if (!strcmp(key + len - 3, "amf")) {
+		else if (!strcmp(key + len - 4, "/amf")) {
 			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->amf,
 					HSS_AMF_LEN);
 		}
 
-		else if (!strcmp(key + len - 4, "rand")) {
+		else if (!strcmp(key + len - 5, "/rand")) {
 			ogs_ascii_to_hex(tmp->val, strlen(tmp->val), auth_info->rand,
 					OGS_RAND_LEN);
 		}
 
-		else if (!strcmp(key + len - 3, "sqn")) {
+		else if (!strcmp(key + len - 4, "/sqn")) {
 			//	tricky - convert ascii string to int64
 			auth_info->sqn = strtol(tmp->val, NULL, 10);
 		}
@@ -445,13 +452,17 @@ int hss_db_update_rand_and_sqn_consul(char *imsi_bcd, uint8_t *rand, uint64_t sq
 
 //	d_error("imsi is %s\n", imsi_bcd);
 
+//	ogs_warn("in upd rnd sqn consul\n");
+
 	ogs_consul_t *ctxt = ogs_consul();
 	char printable_rand[128];
+	memset(printable_rand, 0, 128*sizeof(char));
 
 	ogs_assert(rand);
 	ogs_hex_to_ascii(rand, OGS_RAND_LEN, printable_rand, sizeof(printable_rand));
 
 	char qkey[1024];
+	memset(qkey, 0, 1024*sizeof(char));
 
 	sprintf(qkey, "subscribers/%s/rand", imsi_bcd);
 	consul_put(ctxt->client, qkey, printable_rand);
@@ -507,6 +518,8 @@ int hss_db_update_rand_and_sqn(
 int hss_db_increment_sqn_consul(char *imsi_bcd) {
 
 //	d_error("imsi is %s\n", imsi_bcd);
+
+//	ogs_warn("in inc sqn consul\n");
 
 	ogs_consul_t *ctxt = ogs_consul();
 	char qkey[1024];
@@ -581,8 +594,11 @@ int hss_db_subscription_data_consul(char *imsi_bcd, ogs_diam_s6a_subscription_da
 
 //	d_error("imsi is %s", imsi_bcd);
 
+//	ogs_warn("in sub data consul\n");
+
 	ogs_consul_t *ctxt = ogs_consul();
 	char qkey[1024];
+	memset(qkey, 0, sizeof(char)*1024);
 
 	sprintf(qkey, "subscribers/%s", imsi_bcd);
 	consul_kv_t *ll = consul_get_recurse(ctxt->client, qkey);

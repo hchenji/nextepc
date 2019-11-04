@@ -41,7 +41,7 @@ int ogs_consul_init(const char *db_uri) {
     }
 
     //  ptr now points to one character behind the / before the db name
-    //  d_print("%s\n", ptr+2);
+    ogs_info("%s\n", ptr+2);
     char *name = malloc(sizeof(char) * strlen(ptr+2));
     strcpy(name, ptr+2);
     self.name = name;
@@ -51,8 +51,8 @@ int ogs_consul_init(const char *db_uri) {
     strcpy(uri, "http://");
     memcpy(uri+7, db_uri+9, (ptr-db_uri + 1 - 9));
     uri[(ptr-db_uri + 1 - 9 + 7)] = '\0';
-//  d_print("context setting uri to %s\n", uri);
-//  d_print("context setting dbname to %s\n", self.db_name);
+    ogs_info("context setting uri to %s\n", uri);
+    ogs_info("context setting dbname to %s\n", self.name);
     self.client = consul_client_init(uri, name);
 
     return OGS_OK;
