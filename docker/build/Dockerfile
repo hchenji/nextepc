@@ -15,5 +15,5 @@ RUN	git clone https://github.com/$USER/$REPO
 ADD https://api.github.com/repos/$USER/$REPO/git/refs/heads/$BRANCH /root/open5gs-ver.json
 
 RUN	cd $REPO && \
-	git fetch && git checkout -f -B $BRANCH origin/$BRANCH && \
+	git fetch && git checkout -f -B $BRANCH origin/$BRANCH && git checkout v1.0.0 && \
     meson build && ninja -C build install
