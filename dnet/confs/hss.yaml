@@ -2,7 +2,8 @@ db_uri: mongodb://localhost/open5gs
 
 logger:
     file: /var/log/open5gs/hss.log
-    level: debug
+    trace:
+      diameter: 30
 
 parameter:
     no_ipv6: true

@@ -15,12 +15,12 @@ RUN apt-get install -y iputils-ping dnsutils tcpdump nmap
 RUN apt-get install -y wget unzip cmake build-essential cmake flex bison libgnutls28-dev libgcrypt-dev libssl-dev libidn11-dev libmongoc-dev libbson-dev libyaml-dev git
 RUN apt-get install -y libsctp-dev python3-pip ninja-build
 
-#RUN wget https://github.com/hchenji/open5gs/archive/nextepc-consul.zip
-#RUN unzip nextepc-consul.zip
-# WORKDIR /root/open5gs-nextepc-consul
-
-COPY ../../open5gs /root/
+RUN wget https://github.com/hchenji/open5gs/archive/nextepc-consul.zip
+RUN unzip nextepc-consul.zip
 WORKDIR /root/open5gs-nextepc-consul
+
+# COPY ../../open5gs /root/
+# WORKDIR /root/open5gs-nextepc-consul
 
 RUN pip3 install meson
 RUN meson build

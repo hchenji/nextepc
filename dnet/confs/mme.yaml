@@ -1,5 +1,7 @@
 logger:
     file: /var/log/open5gs/mme.log
+    trace:
+      diameter: 30
 
 parameter:
     no_ipv6: true
