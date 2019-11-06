@@ -16,17 +16,16 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 project('open5gs', 'c',
-    version : '1.0.0',
+    version : '1.1.0',
     license : 'AGPL-3.0-or-later',
     meson_version : '>= 0.43.0',
     default_options : [
-        'warning_level=1',
         'c_std=gnu89',
         'prefix=/usr',
     ],
 )
 
-libogslib_version = '1.0.0'
+libogslib_version = '1.1.0'
 
 prefix = get_option('prefix')
 bindir = join_paths(prefix, get_option('bindir'))
@@ -109,8 +108,6 @@ endif
 add_project_arguments(
     cc.get_supported_arguments(possible_cc_flags),
     language : 'c')
-
-freediameter_proj = subproject('freediameter')
 
 subdir('configs')
 subdir('lib')
