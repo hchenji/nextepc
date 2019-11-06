@@ -204,6 +204,10 @@ int ogs_config_parse()
         ogs_assert(root_key);
         if (!strcmp(root_key, "db_uri")) {
             self.db_uri = ogs_yaml_iter_value(&root_iter);
+            if (!memcmp(self.db_uri, "consul://", 9)) {
+                self.use_consul = true;
+            }
+
         } else if (!strcmp(root_key, "logger")) {
             ogs_yaml_iter_t logger_iter;
             ogs_yaml_iter_recurse(&root_iter, &logger_iter);

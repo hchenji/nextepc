@@ -1,4 +1,4 @@
-db_uri: mongodb://localhost/open5gs
+db_uri: consul://10.10.10.136:8500/nextepc
 
 logger:
     file: /var/log/open5gs/hss.log

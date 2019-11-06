@@ -31,6 +31,8 @@ void ogs_sctp_init(uint16_t port)
 #endif
     usrsctp_sysctl_set_sctp_blackhole(2);
     usrsctp_sysctl_set_sctp_enable_sack_immediately(1);
+
+    ogs_info("usrsctp: make sure to unload sctp kernel modules, else ABORT will be sent for INIT");
 }
 
 void ogs_sctp_final()
