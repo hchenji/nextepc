@@ -1,3 +1,4 @@
+usr/lib/*/libusrsctp*.so*
 usr/lib/*/libogs*.so*
 usr/lib/*/libfd*.so*
 usr/lib/*/freeDiameter/*.fdx

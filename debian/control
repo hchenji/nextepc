@@ -14,7 +14,6 @@ Build-Depends: debhelper (>= 11),
                libidn11-dev,
                libmongoc-dev,
                libbson-dev,
-               libsctp-dev,
                libyaml-dev,
 Standards-Version: 4.3.0
 Rules-Requires-Root: no

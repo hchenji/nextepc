@@ -2,6 +2,6 @@ version: '3.7'
 
 services:
   epc:
-    image: wsrg/o5gs
+    image: wsrg/o5gs:master
     build:
       context: .

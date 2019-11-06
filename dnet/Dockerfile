@@ -1,4 +1,4 @@
-# builds the libsctp version using deb
+# builds the libusrsctp version compiled into o5gs
 
 FROM ubuntu:18.04
 
@@ -12,7 +12,7 @@ WORKDIR /root
 RUN apt-get update 
 RUN apt-get install -y wget libidn11 libbson-1.0-0 libcurl4-openssl-dev libgnutls30 libmongoc-1.0-0 libssl1.1 libyaml-0-2 iproute2 iptables
 
-RUN apt-get install -y iputils-ping dnsutils tcpdump nmap libsctp1
+RUN apt-get install -y iputils-ping dnsutils tcpdump nmap
 
 COPY open5gs-container-epc_1.0.0_amd64.deb /root/
 RUN dpkg -i /root/*.deb 

@@ -5,7 +5,7 @@ services:
   mme:
     depends_on:
       - hss
-    image: wsrg/o5gs
+    image: wsrg/o5gs:master
     network_mode: "host"
     # networks:
       # dnet:
@@ -43,7 +43,7 @@ services:
     environment:
       DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
       MONGOC_DISABLE_SHM: 1
-    image: wsrg/o5gs
+    image: wsrg/o5gs:master
     # network_mode: "dnet"
     cap_add:
       - NET_ADMIN
@@ -64,7 +64,7 @@ services:
 
 #sgw is on br-dnet
   sgw:
-    image: wsrg/o5gs
+    image: wsrg/o5gs:master
     networks:
       default:
         aliases:
@@ -94,7 +94,7 @@ services:
       DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
       MONGOC_DISABLE_SHM: 1
 
-    image: wsrg/o5gs
+    image: wsrg/o5gs:master
     networks:
       default:
         aliases:
@@ -115,7 +115,7 @@ services:
   pgw:
     depends_on:
       - pcrf
-    image: wsrg/o5gs
+    image: wsrg/o5gs:master
     # network_mode: "host"
     environment:
       NEPC_PGW_DNS4: ${DC_UE_DNS}
