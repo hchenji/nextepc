@@ -1,0 +1,155 @@
+[
+	{
+		"key": "nextepc/pdn/0/apn",
+		"flags": 0,
+		"value": "aW50ZXJuZXQ="
+	},
+	{
+		"key": "nextepc/pdn/0/qos/arp/pre_emption_capability",
+		"flags": 0,
+		"value": "MQ=="
+	},
+	{
+		"key": "nextepc/pdn/0/qos/arp/pre_emption_vulnerability",
+		"flags": 0,
+		"value": "MQ=="
+	},
+	{
+		"key": "nextepc/pdn/0/qos/arp/priority_level",
+		"flags": 0,
+		"value": "OA=="
+	},
+	{
+		"key": "nextepc/pdn/0/qos/qci",
+		"flags": 0,
+		"value": "OQ=="
+	},
+	{
+		"key": "nextepc/pdn/0/type",
+		"flags": 0,
+		"value": "Mg=="
+	},
+
+	{
+		"key": "nextepc/subscribers/901700000020786/access_restriction_data",
+		"flags": 0,
+		"value": "MzI="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/ambr/downlink",
+		"flags": 0,
+		"value": "MTAyNDAwMA=="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/ambr/uplink",
+		"flags": 0,
+		"value": "MTAyNDAwMA=="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/amf",
+		"flags": 0,
+		"value": "ODAwMA=="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/k",
+		"flags": 0,
+		"value": "RTYyNUNGQzU2QUYxRjgzNjc0RkY3M0Y4Mjg3MUY3QTI="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/network_access_mode",
+		"flags": 0,
+		"value": "Mg=="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/opc",
+		"flags": 0,
+		"value": "RUIwRDI4Q0Q0MEE5NzRCRjI0NTE2QUIwRkI3OEM3MTk="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/pdn",
+		"flags": 0,
+		"value": "WzBd"
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/rand",
+		"flags": 0,
+		"value": "NDkyMDExMDYgREQ2NDVBRjcgOUNFMDE1NDQgMDlCNkUyQkI="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/sqn",
+		"flags": 0,
+		"value": "Mjg5"
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/subscribed_rau_tau_timer",
+		"flags": 0,
+		"value": "MTI="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020786/subscriber_status",
+		"flags": 0,
+		"value": "MA=="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/access_restriction_data",
+		"flags": 0,
+		"value": "MzI="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/ambr/downlink",
+		"flags": 0,
+		"value": "MTAyNDAwMA=="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/ambr/uplink",
+		"flags": 0,
+		"value": "MTAyNDAwMA=="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/amf",
+		"flags": 0,
+		"value": "ODAwMA=="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/k",
+		"flags": 0,
+		"value": "MTYzOTJFRTIyMzVERDE0NEEwQjI5MzA5RTY0N0M3MUQ="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/network_access_mode",
+		"flags": 0,
+		"value": "Mg=="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/opc",
+		"flags": 0,
+		"value": "NUQ5QzBFNEY2OTQ0QkQwN0ZCNzQ0QUY1RkQyNjc3QkU="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/pdn",
+		"flags": 0,
+		"value": "WzBd"
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/rand",
+		"flags": 0,
+		"value": "NDkyMDExMDYgREQ2NDVBRjcgOUNFMDE1NDQgMDlCNkUyQkI="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/sqn",
+		"flags": 0,
+		"value": "Mjg5"
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/subscribed_rau_tau_timer",
+		"flags": 0,
+		"value": "MTI="
+	},
+	{
+		"key": "nextepc/subscribers/901700000020787/subscriber_status",
+		"flags": 0,
+		"value": "MA=="
+	}
+]
+
+

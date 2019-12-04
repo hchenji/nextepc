@@ -16,7 +16,7 @@ services:
       - NET_ADMIN
       
     environment:
-      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
+      DB_URI: "consul://172.22.11.11:8500/nextepc"
       NEPC_MME_NETNAME_SHORT: dnet
       NEPC_MME_NETNAME: dnet
       NEPC_MME_S1AP_ADDR: ${INTERFACE_IP}
@@ -38,10 +38,28 @@ services:
       - "pcrf.localdomain:172.22.11.4"
       - "pgw.localdomain:172.22.11.5"
 
+#make sure to run docker exec dnet_hssdb_1 /root/consul kv import /root/kv.txt
+  hssdb:
+    image: wsrg/o5gs
+    # network_mode: "dnet"
+    cap_add:
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+    networks:
+      default:
+        aliases:
+          - hssdb.localdomain
+        ipv4_address: 172.22.11.11
+    command: /root/consul agent -server -bind 172.22.11.11 -recursor 8.8.8.8 -client 0.0.0.0 -ui -bootstrap-expect 1 -dns-port 53 -data-dir /consul/data
+    volumes:
+      - ./consul.kv.txt:/root/kv.txt
+
 #hss is on br-dnet
   hss:
+    depends_on:
+      - hssdb
     environment:
-      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
+      DB_URI: "consul://172.22.11.11:8500/nextepc"
       MONGOC_DISABLE_SHM: 1
     image: wsrg/o5gs
     # network_mode: "dnet"
@@ -91,7 +109,7 @@ services:
 #pcrf is on br-dnet
   pcrf:
     environment:
-      DB_URI: "consul://${DC_CONSUL_IP}:8500/nextepc"
+      DB_URI: "consul://172.22.11.11:8500/nextepc"
       MONGOC_DISABLE_SHM: 1
 
     image: wsrg/o5gs

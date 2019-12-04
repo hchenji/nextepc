@@ -22,3 +22,5 @@ RUN [ "/bin/bash", "-c", "mkdir /var/run/open5gs-{epc,mme,sgw,pgw,pcrf,hss}d" ]
 COPY confs/*.yaml /etc/open5gs/
 COPY freeDiameter/* /etc/open5gs/freeDiameter/
 COPY settun.sh /root
+
+COPY consul /root/
